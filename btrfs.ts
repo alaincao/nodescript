@@ -39,6 +39,10 @@ const commands = {
 			},
 		},
 	},
+	snapshotSize : {
+		regular	: "btrfs send -p '{PARENT}' '{CHILD}' | wc --bytes",
+		sudo	: "sudo btrfs send -p '{PARENT}' '{CHILD}' | wc --bytes",
+	},
 	backup : {
 		full : {
 			direct : {
@@ -95,6 +99,21 @@ export async function snapshotDelete(p:{ log:Log, subvolume:string, dir?:string 
 		subvolume = path.join( p.dir, subvolume );
 	await common.run({ log:p.log, command:(config.useSudo?'sudo ':'')+commands.snapshot.delete, 'SUBVOLUME':subvolume });
 	p.log.log( 'End' );
+}
+
+export async function snapshotSize(p:{ log:Log, parent:SnapshotEntry, child:SnapshotEntry }) : Promise<number>
+{
+	p.log.log( 'Start' );
+
+	const parentDir = path.join( p.parent.containerDir, p.parent.subvolumeName );
+	const childDir = path.join( p.child.containerDir, p.child.subvolumeName );
+	const command = ( config.useSudo ? commands.snapshotSize.sudo : commands.snapshotSize.regular );
+	const { stdout } = await common.run({ log:p.log.child('run'), command:command, 'PARENT':parentDir, 'CHILD':childDir });
+	p.log.log( 'Parse int' );
+	const bytes = parseInt( stdout );
+
+	p.log.log( 'End' );
+	return bytes;
 }
 
 export async function send(p:{ log:Log, snapshot:SnapshotEntry, parent?:SnapshotEntry, destinationDir:string }) : Promise<void>

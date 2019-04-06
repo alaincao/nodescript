@@ -93,7 +93,7 @@ export function run(p:{ log:Log, command:string, logstds?:boolean, stdin?:string
 		p.log.child( 'stderr' ).logLines( stderr );
 	}
 
-	return new Promise<{err:Error,stdout:string,stderr:string}>( function(resolve, reject)
+	return new Promise<{stdout:string,stderr:string}>( function(resolve, reject)
 		{
 			p.log.log( 'launch:', command );
 			const ps = exec( command, function(err, stdout, stderr)
@@ -107,8 +107,8 @@ export function run(p:{ log:Log, command:string, logstds?:boolean, stdin?:string
 
 					if( (p.logstds == null) || (p.logstds == true) )
 						logStds( stdout, stderr );
-					p.log.log( 'exited ; err:', err );
-					resolve({ err:err, stdout:stdout, stderr:stderr });
+					p.log.log( 'exited' );
+					resolve({ stdout:stdout, stderr:stderr });
 				} );
 			if( p.stdin != null )
 			{
