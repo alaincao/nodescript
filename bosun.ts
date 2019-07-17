@@ -1,7 +1,6 @@
 
 import * as http from 'http';
 import * as https from 'https';
-import { hostname } from 'os';
 import * as moment from 'moment';
 import * as common from './common';
 import logger from './logger';
@@ -61,7 +60,7 @@ export function send_legacy(p:{values:Item[]}) : void
 	const requestContent = JSON.stringify( p.values );
 	const ht = config.bosunHostInSSL ? https : http;
 	const request = ht.request( {	host: config.bosunHost,
-									port: 80,
+									port: config.bosunHostInSSL ? 443 : 80,
 									path: '/api/put',
 									method: 'POST',
 									headers: {	'Content-Type': 'application/x-www-form-urlencoded',
@@ -88,7 +87,7 @@ export async function send(log:logger, values:Item[]) : Promise<void>
 		{
 			const ht = config.bosunHostInSSL ? https : http;
 			const request = ht.request( {	host: config.bosunHost,
-											port: 443,
+											port: config.bosunHostInSSL ? 443 : 80,
 											path: '/api/put',
 											method: 'POST',
 											headers: {	'Content-Type': 'application/x-www-form-urlencoded',
