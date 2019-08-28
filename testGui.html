@@ -1,0 +1,45 @@
+<html>
+<head>
+	<title>Test NodeJS - Electron application</title>
+	<link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/font-awesome/4.7.0/css/font-awesome.min.css" integrity="sha384-wvfXpqpZZVQGK6TAh5PVlGOfQNHSoD2xbE+QkPxCAFlNEevoEH3Sl0sibVcOQVnN" crossorigin="anonymous">
+</head>
+<body>
+<div id="blockingDiv"><!-- nb: Not 'body' to allow scrolling when blocked -->
+
+	Hello <span data-bind="text:koHelloWho"></span><br/>
+	<button data-bind="click:clickHelloWho">Click me!</button>
+
+</div><!-- blockingDiv -->
+
+
+<!-- Scripts -->
+
+<script src="testGui.js"></script>
+<script>
+	// cf. https://electronjs.org/docs/faq ; search for 'jquery'
+	window.nodeRequire = require;
+	delete window.require;
+	delete window.exports;
+	delete window.module;
+</script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.3.1/jquery.min.js" integrity="sha384-tsQFqpEReu7ZLhBV2VZlAu7zcOV+rXbYlF2cqB8txI/8aZajjp4Bqd+V6D5IgvKT" crossorigin="anonymous"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jquery.blockUI/2.70/jquery.blockUI.js" integrity="sha384-+3lnAV34UsA0c59ybqb+vbs3KbdvCAPQE56gNoCIQJqi7z1n8B4+kCqCJvoYOrTz" crossorigin="anonymous"></script>
+<script type="text/javascript">
+	$.blockUI.defaults.fadeOut = 0;  // No animation for unblocking
+	$.blockUI.defaults.message = '<i class="fa fa-circle-o-notch fa-spin fa-3x fa-fw margin-bottom"></i>';
+	$.blockUI.defaults.overlayCSS.backgroundColor = '#fff';
+	$.blockUI.defaults.css.border = 'none';
+	$.blockUI.defaults.css.backgroundColor = 'transparent';
+</script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/knockout/3.4.2/knockout-min.js" integrity="sha384-/EjRuG6YTb6zCFou+DBnYCi5u9E1RjUMJanyGOL7DUYLp6wSCUuHNhd58uoGj7jh" crossorigin="anonymous"></script>
+<script type="text/javascript">
+
+	// Run application
+	application.main({
+			$blockingDiv	: $('#blockingDiv'),
+			$appContainer	: $('#blockingDiv'),
+		});
+</script>
+
+</body>
+</html>

@@ -1,0 +1,51 @@
+{
+	// See https://go.microsoft.com/fwlink/?LinkId=733558
+	// for the documentation about the tasks.json format
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"label": "run test.js",
+			"group": "test",
+			"type": "shell",
+			"problemMatcher": [],
+			"command": "node ./test.js",
+			"args": [],
+			"options": {}
+		},
+		{
+			"label": "run testGui.js",
+			"type": "shell",
+			"problemMatcher": [],
+			"command": "./node_modules/.bin/electron ./testGui.js",
+			"args": [],
+			"options": {}
+		},
+		{
+			"label": "run createDirHierarchy.js",
+			"type": "shell",
+			"problemMatcher": [],
+			"command": "node ./createDirHierarchy.js",
+			"args": [],
+			"options": {}
+		},
+		{
+			"type": "gulp",
+			"task": "clean",
+			"problemMatcher": []
+		},
+		{
+			"type": "gulp",
+			"task": "default",
+			"problemMatcher": [
+				"$gulp-tsc"
+			]
+		},
+		{
+			"type": "gulp",
+			"task": "testGui.js",
+			"problemMatcher": [
+				"$gulp-tsc"
+			]
+		},
+	]
+}
