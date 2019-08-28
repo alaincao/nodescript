@@ -7,6 +7,7 @@ import * as glob from 'glob';
 import * as http from 'http';
 import * as https from 'https';
 import * as moment from 'moment';
+import * as JSON5 from 'json5';
 import Log from './logger';
 
 export var NOW : moment.Moment;
@@ -277,6 +278,33 @@ export async function rmrf(p:{ dir?:string, name?:string, path?:string }) : Prom
 		// File
 		await rm( p );
 	}
+}
+
+export async function readFile(p:{ filePath:string }) : Promise<string>
+{
+	return new Promise<string>( (resolve,reject)=>
+		{
+			fs.readFile( p.filePath, 'utf8', (err,content)=>
+			{
+				if( err )
+					reject( err );
+				else
+					resolve( content );
+			} );
+		} );
+}
+
+export async function readJSON<T>(p:{ filePath?:string, jsonText?:string }) : Promise<T>
+{
+	let jsonText = p.jsonText;
+
+	if( p.filePath != null )
+		jsonText = await readFile({ filePath:p.filePath });
+
+	if( jsonText == null )
+		throw `'readJSON()': Missing JSON source`;
+
+	return JSON5.parse( jsonText );
 }
 
 /** https://stackoverflow.com/questions/10420352/converting-file-size-in-bytes-to-human-readable-string */

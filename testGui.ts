@@ -39,7 +39,7 @@ export async function main(p:{
 	const configFileName = path.basename( __filename ).replace( /\.html$/, '.json' );
 	const configFilePath = path.join( __dirname, configFileName );
 	log.log( `Load config at '${configFilePath}'` );
-	config = require( configFilePath );
+	config = await common.readJSON({ filePath:configFilePath });
 
 	ko.applyBindings( self, p.$appContainer[0] );
 	log.log( 'END' );

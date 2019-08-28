@@ -29,6 +29,7 @@ const externals = [
 					'unzipper',
 					'azure-storage',
 					'electron',
+					'json5',
 				];
 
 gulp.task( 'test.js',					function(){ return compileTypeScript('./test.ts',				'test.js',					'./', false,	true); });
