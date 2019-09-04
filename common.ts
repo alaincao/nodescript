@@ -4,6 +4,8 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { exec } from 'child_process';
 import * as glob from 'glob';
+import * as http from 'http';
+import * as https from 'https';
 import * as moment from 'moment';
 import Log from './logger';
 
@@ -14,15 +16,15 @@ export const tagFormat =  'YYYYMMDD_HHmm';
 export const tagPattern = '????????_????';
 export const tagPatternRegex = '[0-9]{8}_[0-9]{4}';
 
-export function init(log:Log) : void
+export function init(p:{log:Log, tag?:string}) : void
 {
-	TAG = moment( new Date() ).format( tagFormat );
+	TAG =  ( (p.tag != null) ? p.tag : moment(new Date()).format(tagFormat) );
 	NOW = moment( TAG, tagFormat );  // NB: 'NOW' is trimmed of the 'seconds' part
-	log.log( 'TAG:', TAG, NOW.toISOString() );
+	p.log.log( 'TAG:', TAG, NOW.toISOString() );
 
 	let exitHandler = function(options,err)
 		{
-			log.output();
+			p.log.output();
 			switch( options.mode )
 			{
 				case "on exit":
@@ -42,7 +44,7 @@ export function init(log:Log) : void
 
 	if( typeof(window) === 'undefined' )
 	{
-		log.log( 'In NodeJS application => set up a fake DOM/JQuery/Knockout environment' );
+		p.log.log( 'In NodeJS application => set up a fake DOM/JQuery/Knockout environment' );
 		// https://stackoverflow.com/questions/1801160/can-i-use-jquery-with-node-js
 		const jsdom = require( 'jsdom' );
 		const jquery = require( 'jquery' );
@@ -160,7 +162,6 @@ export async function dirPattern(p:{ log:Log, dir:string, pattern:string, remote
 		// Use SSH
 		p.log.log( 'Remote search:', path.join(p.dir, p.pattern), 'on server', p.remoteServer );
 
-		let names : string[];
 		try
 		{
 			const dirPattern = path.join( p.dir, p.pattern );
@@ -299,6 +300,14 @@ export function humanFileSize(bytes:number, si?:boolean) : string
 	return bytes.toFixed(1)+' '+units[u];
 }
 
+export async function readFileLines(filePath:string) : Promise<string[]>
+{
+	const buffer = await fs.promises.readFile( filePath );
+	const txt = buffer.toString();
+	const lines : string[] = txt.match( /[^\r\n]+/g );
+	return lines;
+}
+
 export function isNullOrWhiteSpace(str?:string) : boolean
 {
 	if( str == null )
@@ -326,7 +335,7 @@ export function arraySum<T>(a:T[], f:(e:T)=>number) : number
 	return rc;
 }
 
-export function arrayToDictionary<T>( a:T[], keyCast:(v:T)=>string ) : {[key:string]:T}
+export function arrayToDictionary<T>(a:T[], keyCast:(v:T)=>string) : {[key:string]:T}
 {
 	const dict : {[key:string]:T} = {};
 	a.forEach( v=>
@@ -334,6 +343,31 @@ export function arrayToDictionary<T>( a:T[], keyCast:(v:T)=>string ) : {[key:str
 			dict[ keyCast(v) ] = v
 		} );
 	return dict;
+}
+
+/** Split the specified array into multiple arrays according to a grouping key */
+export function arrayToListOfArrays<T>(a:T[], groupingKeyCast:(v:T)=>string) : T[][]
+{
+	// Group items into an object "key->T[]"
+	const grouped = a.reduce<{[key:string]:T[]}>( (accu,current)=>
+	{
+		const key = groupingKeyCast( current );
+		let list = accu[ key ];
+		if( list == null )
+		{
+			list = [];
+			accu[ key ] = list;
+		}
+		list.push( current );
+		return accu;
+	}, {} );
+
+	// From the object, create arrays
+	const list : T[][] = [];
+	for( let key in grouped )
+		list.push( grouped[key] );
+
+	return list;
 }
 
 /** Throttles the concurrent execution of Promises (e.g. the reduce the number of concurrent requests to a server) */
@@ -418,21 +452,28 @@ export namespace url
 			url = `${url}?${parms}`;
 		}
 
+		const ht = url.startsWith('https:') ? https : http;
+		let data = '';
 		return new Promise<string>( (resolve,reject)=>
 			{
-				$.ajax({	type		: 'GET',
-							url			: url,
-							contentType	: 'text/html',
-							dataType	: 'text',
-							success		: (data,textStatus,jqXHR)=>
-											{
-												resolve( data );
-											},
-							error		: (jqXHR,textStatus,errorThrown)=>
-											{
-												reject( textStatus );
-											},
-						});
+				ht.get( url, (resp)=>
+						{
+							resp.on( 'data', (chunk)=>
+								{
+									data += chunk;
+								} );
+							resp.on( 'end', ()=>
+								{
+									if( resp.statusCode != 200 ) // HTTP OK
+										reject( `Request failed with status code ${resp.statusCode}` );
+									else
+										resolve( data );
+								} );
+						} )
+					.on( 'error', (err)=>
+						{
+							reject( err );
+						} );
 			} );
 	}
 

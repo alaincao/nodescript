@@ -5,13 +5,19 @@ import * as moment from 'moment';
 import Log from './logger';
 import * as common from './common';
 
+import * as azure from './azure';
+import * as backup from './backup';
+import * as bosun from './bosun';
+import * as btrfs from './btrfs';
+import * as sensors from './sensors';
+
 async function main() : Promise<void>
 {
 	const log = new Log( 'test' );
 	log.log( '*** start' );
 	try
 	{
-		common.init( log );
+		common.init({ log });
 
 		log.log( 'Hello world' );
 

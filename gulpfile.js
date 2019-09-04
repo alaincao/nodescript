@@ -11,7 +11,8 @@ const buffer = require('vinyl-buffer');
 const sourcemaps = require('gulp-sourcemaps');
 
 // 'requires' NOT included by browserify (i.e. everything in node_modules):
-const externals = [	'process',
+const externals = [
+					'process',
 					'path',
 					'fs',
 					'url',
@@ -20,18 +21,22 @@ const externals = [	'process',
 					'child_process',
 					'moment',
 					'http',
-					'request',
+					'https',
 					'buffer',
 					'jsdom',
 					'jquery',
 					'knockout',
 					'unzipper',
+					'azure-storage',
 					'electron',
 				];
 
 gulp.task( 'test.js',					function(){ return compileTypeScript('./test.ts',				'test.js',					'./', false,	true); });
 gulp.task( 'testGui.js',				function(){ return compileTypeScript('./testGui.ts',			'testGui.js',				'./', false,	false); });
-gulp.task( 'default', gulp.parallel('testGui.js', 'test.js') );
+gulp.task( 'default', gulp.parallel(
+					'testGui.js',
+					'test.js',
+				) );
 
 gulp.task( 'clean', function()
 {

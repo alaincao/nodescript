@@ -32,7 +32,7 @@ export async function main(p:{
 			console.log.apply( console, a );
 		} );
 	log.log( 'START' );
-	common.init( log );
+	common.init({ log });
 	$blockingDiv	= p.$blockingDiv;
 	koHelloWho		= ko.observable( null );
 

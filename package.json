@@ -8,6 +8,7 @@
     "url": "https://github.com/alaincao/test.git"
   },
   "dependencies": {
+    "azure-storage": "^2.10.2",
     "child_process": "^1.0.2",
     "electron": "^2.0.18",
     "glob": "^7.1.4",
