@@ -12,24 +12,24 @@ const sourcemaps = require('gulp-sourcemaps');
 
 // 'requires' NOT included by browserify (i.e. everything in node_modules):
 const externals = [
-					'process',
-					'path',
-					'fs',
-					'url',
-					'hjson',
-					'glob',
+					'azure-storage',
+					'buffer',
 					'child_process',
-					'moment',
+					'electron',
+					'fs',
+					'glob',
+					'hjson',
 					'http',
 					'https',
-					'buffer',
-					'jsdom',
 					'jquery',
-					'knockout',
-					'unzipper',
-					'azure-storage',
-					'electron',
+					'jsdom',
 					'json5',
+					'knockout',
+					'moment',
+					'path',
+					'process',
+					'unzipper',
+					'url',
 				];
 
 gulp.task( 'test.js',					function(){ return compileTypeScript('./test.ts',				'test.js',					'./', false,	true); });
