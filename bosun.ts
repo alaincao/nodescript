@@ -10,6 +10,9 @@ export const config = {  // NB: exported variables are constants => Need a conta
 		bosunHost		: 'bosun.sigmaconso.com',
 		bosunHostInSSL	: true,
 		useSudo			: false,
+		sendBatchSize	: 10,
+		sendRetryNumber	: 3,
+		sendRetryDelay	: 3000,  // In milliseconds
 	};
 export const metricContainer = 'Sigma.Docker.ContainerSize';
 export const metricSubvolume = 'Sigma.SubvolumeSize';
@@ -79,6 +82,50 @@ export function send_legacy(p:{values:Item[]}) : void
 }
 
 export async function send(log:logger, values:Item[]) : Promise<void>
+{
+	log.log( `Create batches of ${config.sendBatchSize} items ; ${values.length} items to send` );
+	const batches : Item[][] = [];
+	for( let i=0; i<values.length; i+=config.sendBatchSize )
+		batches.push( values.slice(i, i+config.sendBatchSize) );
+
+	for( let i=0; i<batches.length; ++i )
+	{
+		const batch = batches[ i ];
+		const log2 = log.child( `batch_${i+1}` );
+		log2.log( `Batch size: ${batch.length}` );
+
+		let retry = 0;
+	RETRY:
+		while( true )
+		{
+			try
+			{
+				await send_private( log2, batch );
+			}
+			catch( ex )
+			{
+				log2.exception( ex );
+				if( (++retry) < config.sendRetryNumber )
+				{
+					log2.log( `Sent failed. Pause ${config.sendRetryDelay} miliseconds` );
+					await common.sleep( config.sendRetryDelay );
+					log2.log( `Try ${retry+1}/${config.sendRetryNumber}` );
+					continue RETRY;
+				}
+				else
+				{
+					log2.log( `Try ${retry}/${config.sendRetryNumber} failed ; Aborting` );
+					throw ex;
+				}
+			}
+
+			// Sent OK
+			break RETRY;
+		} // while(true)
+	} // for(batches)
+}
+
+function send_private(log:logger, values:Item[]) : Promise<void>
 {
 	const requestContent = JSON.stringify( values );
 	log.log( 'Send: ', requestContent );
