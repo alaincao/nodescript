@@ -47,21 +47,21 @@ const commands = {
 		full : {
 			direct : {
 				regular	: "btrfs send '{SRC}' | pigz -c -9 > '{DST_FILE}'",
-				sudo	: "sudo btrfs send '{SRC}' | pigz -c -9 | tee '{DST_FILE}' > /dev/null",
+				sudo	: "sudo btrfs send '{SRC}' | pigz -c -9 | sudo tee '{DST_FILE}' > /dev/null",
 			},
 			tee : {
 				regular	: "btrfs send '{SRC}' | pigz -c -9 | tee '{DST_FILE}' | gunzip -c | btrfs receive '{DST_SNAP_DIR}'",
-				sudo	: "sudo btrfs send '{SRC}' | pigz -c -9 | tee '{DST_FILE}' | gunzip -c | sudo btrfs receive '{DST_SNAP_DIR}'",
+				sudo	: "sudo btrfs send '{SRC}' | pigz -c -9 | sudo tee '{DST_FILE}' | gunzip -c | sudo btrfs receive '{DST_SNAP_DIR}'",
 			},
 		},
 		partial : {
 			direct : {
 				regular	: "btrfs send -p '{PARENT}' '{SRC}' | pigz -c -9 > '{DST_FILE}'",
-				sudo	: "sudo btrfs send -p '{PARENT}' '{SRC}' | pigz -c -9 | tee '{DST_FILE}' > /dev/null",
+				sudo	: "sudo btrfs send -p '{PARENT}' '{SRC}' | pigz -c -9 | sudo tee '{DST_FILE}' > /dev/null",
 			},
 			tee : {
 				regular	: "btrfs send -p '{PARENT}' '{SRC}' | pigz -c -9 | tee '{DST_FILE}' | gunzip -c | btrfs receive '{DST_SNAP_DIR}'",
-				sudo	: "sudo btrfs send -p '{PARENT}' '{SRC}' | pigz -c -9 | tee '{DST_FILE}' | gunzip -c | sudo btrfs receive '{DST_SNAP_DIR}'",
+				sudo	: "sudo btrfs send -p '{PARENT}' '{SRC}' | pigz -c -9 | sudo tee '{DST_FILE}' | gunzip -c | sudo btrfs receive '{DST_SNAP_DIR}'",
 			},
 		},
 	},
