@@ -194,6 +194,8 @@ export async function snapshotsRotation_keepOnlyLast2(p:{ log:Log, name:string, 
 export async function snapshotsRotation_keepOnlyLast3(p:{ log:Log, name:string, dir:string }) : Promise<void>	{ return snapshotsRotation_keepOnlyLastX({ log:p.log, name:p.name, dir:p.dir, n:3 }); }
 export async function snapshotsRotation_keepOnlyLast5(p:{ log:Log, name:string, dir:string }) : Promise<void>	{ return snapshotsRotation_keepOnlyLastX({ log:p.log, name:p.name, dir:p.dir, n:5 }); }
 export async function snapshotsRotation_keepOnlyLast10(p:{ log:Log, name:string, dir:string }) : Promise<void>	{ return snapshotsRotation_keepOnlyLastX({ log:p.log, name:p.name, dir:p.dir, n:10 }); }
+export async function snapshotsRotation_keepOnlyLast15(p:{ log:Log, name:string, dir:string }) : Promise<void>	{ return snapshotsRotation_keepOnlyLastX({ log:p.log, name:p.name, dir:p.dir, n:15 }); }
+export async function snapshotsRotation_keepOnlyLast30(p:{ log:Log, name:string, dir:string }) : Promise<void>	{ return snapshotsRotation_keepOnlyLastX({ log:p.log, name:p.name, dir:p.dir, n:30 }); }
 async function snapshotsRotation_keepOnlyLastX(p:{ log:Log, name:string, dir:string, n:number }) : Promise<void>
 {
 	p.log.log( 'Get list of existing snapshots' );
