@@ -1,0 +1,88 @@
+<html>
+<head>
+	<title>BTRFS snapshost size calculator</title>
+	<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.9.0/css/all.min.css" integrity="sha384-i1LQnF23gykqWXg6jxC2ZbCbUMxyw5gLZY6UiUS98LYV5unm8GWmfkIS6jqJfb4E" crossorigin="anonymous">
+</head>
+<body>
+<div id="vfsbla">
+
+	<label>Directory <span data-bind="text:koDirectory" style="white-space:nowrap;border:1px solid lightgrey"></span><input type="file" data-bind="event:{ change:(app,evt)=>{ $root.koDirectory(evt.target.files[0].path); } }" webkitdirectory style="display:none"/></label><br/>
+	<label>Name <input type="text" data-bind="value:koName"/></label><br/>
+	<label><input type="checkbox" data-bind="checked:koUseSudo"/>Use sudo</label><br/>
+	<label><input type="checkbox" data-bind="checked:koReverse"/>Reverse</label><br/>
+	<button data-bind="click:clickRefresh">Refresh</button><br/>
+
+	<hr/>
+
+	<div data-bind="visible:(koSnapshots() != null)">
+
+		<label><input type="checkbox" data-bind="checked:koHumanReadable"/>Human readable sizes</label><br/>
+		<label><input type="checkbox" data-bind="checked:koSelectAll"/>Select all</label><br/>
+
+		<table data-bind="with:koSnapshots" style="border-collapse:collapse">
+			<thead>
+				<tr data-bind="foreach:headers" style="border:1px solid black">
+					<td data-bind="text:$data" style="border:1px solid black"></td>
+				</tr>
+			</thead>
+			<tbody data-bind="foreach:body">
+				<tr data-bind="foreach:$data" style="border:1px solid black">
+					<td data-bind="attr:{rowspan:rowSpan}" style="border:1px solid black">
+
+						<label>
+							<span data-bind="visible:$data.showChecked">
+								<input type="checkbox" data-bind="checked:$data.checked"/>
+							</span>
+							<span data-bind="text:$data.text"></span>
+						</label>
+						<i data-bind="visible:$data.running" class="fas fa-circle-notch fa-spin fa-fw margin-bottom"></i>
+
+					</td>
+				</tr>
+			</tbody>
+			<tfoot>
+				<tr data-bind="foreach:footers" style="border:1px solid black">
+					<td style="border:1px solid black">
+						<span data-bind="text:$data, visible:($data != null)"></span>
+						<i data-bind="visible:($data == null)" class="fas fa-circle-notch fa-spin fa-fw margin-bottom"></i>
+					</td>
+				</tr>
+			</tfoot>
+		</table>
+
+		<label>Throttler <input type="text" data-bind="value:koThrottler"/></label><br>
+		<button data-bind="click:clickLaunch">Launch</button>
+	</div>
+
+</div>
+
+
+<!-- Scripts -->
+
+<script src="snapshotsSizeGui.js"></script>
+<script>
+	// cf. https://electronjs.org/docs/faq ; search for 'jquery'
+	window.nodeRequire = require;
+	delete window.require;
+	delete window.exports;
+	delete window.module;
+</script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.4.1/jquery.min.js" integrity="sha384-vk5WoKIaW/vJyUAd9n/wmopsmNhiy+L2Z+SBxGYnUkunIxVxAv/UtMOhba/xskxh" crossorigin="anonymous"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jquery.blockUI/2.70/jquery.blockUI.min.js" integrity="sha384-Ct2s0NBxEbvJlnXHOZJheqOGKjX3Q4ewsYoJZYnLz/teMXnlGhim5o9305EkvlsN" crossorigin="anonymous"></script>
+<script type="text/javascript">
+	$.blockUI.defaults.fadeOut = 0;  // No animation for unblocking
+	$.blockUI.defaults.message = '<i class="fas fa-circle-notch fa-spin fa-3x fa-fw margin-bottom"></i>';
+	$.blockUI.defaults.overlayCSS.backgroundColor = '#fff';
+	$.blockUI.defaults.css.border = 'none';
+	$.blockUI.defaults.css.backgroundColor = 'transparent';
+</script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/knockout/3.5.0/knockout-min.js" integrity="sha384-cd17CJ+/vjGWK4Gipm1JaKFFdNvWJhaJZ80qgEJvqqMbZAitKqV22KYncJZxvrmW" crossorigin="anonymous"></script>
+<script type="text/javascript">
+	// Run application
+	application.main({
+			$container : $('#vfsbla'),
+		});
+</script>
+
+</body>
+</html>
