@@ -34,9 +34,11 @@ const externals = [
 
 gulp.task( 'test.js',					function(){ return compileTypeScript('./test.ts',				'test.js',					'./', false,	true); });
 gulp.task( 'testGui.js',				function(){ return compileTypeScript('./testGui.ts',			'testGui.js',				'./', false,	false); });
+gulp.task( 'snapshotsSizeGui.js',		function(){ return compileTypeScript('./snapshotsSizeGui.ts',	'snapshotsSizeGui.js',		'./', false,	false); });
 gulp.task( 'default', gulp.parallel(
 					'testGui.js',
 					'test.js',
+					'snapshotsSizeGui.js',
 				) );
 
 gulp.task( 'clean', function()
@@ -45,6 +47,8 @@ gulp.task( 'clean', function()
 					'./test*.map',
 					'./testGui*.js',
 					'./testGui*.map',
+					'./snapshotsSizeGui*.js',
+					'./snapshotsSizeGui*.map',
 				] );
 } );
 
