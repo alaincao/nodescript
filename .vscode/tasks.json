@@ -21,14 +21,6 @@
 			"options": {}
 		},
 		{
-			"label": "run createDirHierarchy.js",
-			"type": "shell",
-			"problemMatcher": [],
-			"command": "node ./createDirHierarchy.js",
-			"args": [],
-			"options": {}
-		},
-		{
 			"type": "gulp",
 			"task": "clean",
 			"problemMatcher": []

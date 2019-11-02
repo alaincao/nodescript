@@ -188,7 +188,7 @@ export async function runBackupRequest(log:Log, item:BackupRequest) : Promise<vo
 	}
 }
 
-/** Keep only the last snapshot */
+/** Keep only the last X snapshots */
 export async function snapshotsRotation_keepOnlyLast1(p:{ log:Log, name:string, dir:string }) : Promise<void>	{ return snapshotsRotation_keepOnlyLastX({ log:p.log, name:p.name, dir:p.dir, n:1 }); }
 export async function snapshotsRotation_keepOnlyLast2(p:{ log:Log, name:string, dir:string }) : Promise<void>	{ return snapshotsRotation_keepOnlyLastX({ log:p.log, name:p.name, dir:p.dir, n:2 }); }
 export async function snapshotsRotation_keepOnlyLast3(p:{ log:Log, name:string, dir:string }) : Promise<void>	{ return snapshotsRotation_keepOnlyLastX({ log:p.log, name:p.name, dir:p.dir, n:3 }); }

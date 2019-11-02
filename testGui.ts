@@ -52,7 +52,6 @@ export async function clickHelloWho() : Promise<void>
 	common.html.block( $blockingDiv );
 	try
 	{
-
 		log.log({ CWD:process.cwd() });
 		koHelloWho( `${config.helloWho} !` );
 	}

@@ -1,11 +1,11 @@
 {
-  "name": "logstate",
-  "description": "Log state",
+  "name": "foo",
+  "description": "Foo / bar",
   "version": "0.0.0",
   "license": "UNLICENSED",
   "repository": {
     "type": "git",
-    "url": "https://github.com/alaincao/test.git"
+    "url": "https://www.cornify.com/"
   },
   "dependencies": {
     "azure-storage": "^2.10.2",

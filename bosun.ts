@@ -7,17 +7,13 @@ import logger from './logger';
 
 export const config = {  // NB: exported variables are constants => Need a container ; cf. https://github.com/Microsoft/TypeScript/issues/6751
 		hostName		: <string>null,  // REQUIRED !
-		bosunHost		: 'bosun.sigmaconso.com',
-		bosunHostInSSL	: true,
+		bosunHost		: 'UNSET',  // REQUIRED !
+		bosunHostInSSL	: false,
 		useSudo			: false,
 		sendBatchSize	: 10,
 		sendRetryNumber	: 3,
 		sendRetryDelay	: 3000,  // In milliseconds
 	};
-export const metricContainer = 'Sigma.Docker.ContainerSize';
-export const metricSubvolume = 'Sigma.SubvolumeSize';
-// export const metricBackup = 'Sigma.BackupSize';
-export const metricResponseTime = 'Sigma.Http.ResponseTime';
 
 const dirSizeCommand = "du --block-size=1 --summarize '{DIR}' | sed -e 's/\t.*//g'";
 

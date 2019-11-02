@@ -7,8 +7,8 @@ export const config = {  // NB: exported variables are constants => Need a conta
 	useSudo	: false,
 	debug	: false,
 	metrics	: {
-				btrfs : 'Sigma.BtrfsStat',
-				smart : 'Sigma.SmartInfo',
+				btrfs : 'CHANGEME.btrfsstat',
+				smart : 'CHANGEME.smartinfo',
 			},
 };
 

@@ -64,7 +64,7 @@ export function setHasErrors() : void
 	hasErrors = true;
 }
 
-export function sleep(ms) : Promise<void>
+export function sleep(ms:number) : Promise<void>
 {
 	return new Promise( callback=>setTimeout(callback, ms) );
 }
@@ -80,6 +80,7 @@ export function run(p:{ log:Log, command:string, logstds?:boolean, stdin?:string
 				case 'log':
 				case 'command':
 				case 'logstds':
+				case 'stdin':
 					// Regular parameter
 					return;
 			}
@@ -294,6 +295,7 @@ export async function readFile(p:{ filePath:string }) : Promise<string>
 		} );
 }
 
+/** https://json5.org/ */
 export async function readJSON<T>(p:{ filePath?:string, jsonText?:string }) : Promise<T>
 {
 	let jsonText = p.jsonText;
@@ -425,7 +427,7 @@ export class TasksThrotther
 			return rc;
 		}
 
-		// Push a promise in throttled & wait for it
+		// Push a promise in 'throttled' & wait for it
 		const waitFor = new Promise<void>( (resolve)=>
 			{
 				self.throttled.push( resolve );
