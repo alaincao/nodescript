@@ -1,6 +1,6 @@
 {
-  "name": "foo",
-  "description": "Foo / bar",
+  "name": "example_backups",
+  "description": "Example for BTRFS snapshots/backups",
   "version": "0.0.0",
   "license": "UNLICENSED",
   "repository": {
