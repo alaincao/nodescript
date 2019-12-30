@@ -215,10 +215,13 @@ async function snapshotsRotation_keepOnlyLastX(p:{ log:Log, name:string, dir:str
 }
 
 /** Keep everything during X days */
-export function snapshotsRotation_keep3Days(p:{ log:Log, name:string, dir:string }) : Promise<void>		{ return snapshotsRotation_keepNDays({ log:p.log, name:p.name, dir:p.dir, nDays:3 }); }
-export function snapshotsRotation_keep5Days(p:{ log:Log, name:string, dir:string }) : Promise<void>		{ return snapshotsRotation_keepNDays({ log:p.log, name:p.name, dir:p.dir, nDays:5 }); }
-export function snapshotsRotation_keep1Week(p:{ log:Log, name:string, dir:string }) : Promise<void>		{ return snapshotsRotation_keepNDays({ log:p.log, name:p.name, dir:p.dir, nDays:7 }); }
-async function snapshotsRotation_keepNDays(p:{ log:Log, name:string, dir:string, nDays:number }) : Promise<void>
+export function snapshotsRotation_keep3Days(p:{ log:Log, name:string, dir:string }) : Promise<void>		{ return snapshotsRotation_keepNXXX({ log:p.log, name:p.name, dir:p.dir, nDays:3 }); }
+export function snapshotsRotation_keep5Days(p:{ log:Log, name:string, dir:string }) : Promise<void>		{ return snapshotsRotation_keepNXXX({ log:p.log, name:p.name, dir:p.dir, nDays:5 }); }
+export function snapshotsRotation_keep1Week(p:{ log:Log, name:string, dir:string }) : Promise<void>		{ return snapshotsRotation_keepNXXX({ log:p.log, name:p.name, dir:p.dir, nDays:7 }); }
+export function snapshotsRotation_keep1Month(p:{ log:Log, name:string, dir:string }) : Promise<void>	{ return snapshotsRotation_keepNXXX({ log:p.log, name:p.name, dir:p.dir, nMonths:1 }); }
+export function snapshotsRotation_keep2Months(p:{ log:Log, name:string, dir:string }) : Promise<void>	{ return snapshotsRotation_keepNXXX({ log:p.log, name:p.name, dir:p.dir, nMonths:2 }); }
+export function snapshotsRotation_keep3Months(p:{ log:Log, name:string, dir:string }) : Promise<void>	{ return snapshotsRotation_keepNXXX({ log:p.log, name:p.name, dir:p.dir, nMonths:3 }); }
+async function snapshotsRotation_keepNXXX(p:{ log:Log, name:string, dir:string, nDays?:number, nMonths?:number }) : Promise<void>
 {
 	p.log.log( 'Get list of existing snapshots' );
 	const entries = await btrfs.listSnapshots({ log:p.log.child('list'), name:p.name, dir:p.dir });
@@ -230,8 +233,22 @@ async function snapshotsRotation_keepNDays(p:{ log:Log, name:string, dir:string,
 			if( entry.tag == entries.last.tag )
 				// Always keep the last one (should not be needed, but there for safety ...)
 				remove = false;
-			if( entry.diffDays <= p.nDays )
-				remove = false;
+			
+			if( p.nDays != null )
+			{
+				if( entry.diffDays <= p.nDays )
+					remove = false;
+			}
+			else if( p.nMonths != null )
+			{
+				if( entry.diffMonths <= p.nMonths )
+					remove = false;
+			}
+			else
+			{
+				throw "snapshotsRotation_keepNDays: Parameter 'nDays' or 'nMonths' must be specified";
+			}
+
 			if(! remove )
 				p.log.log( 'Leave', entry.subvolumeName );
 			else
