@@ -10,8 +10,10 @@ export const config = {  // NB: exported variables are constants => Need a conta
 export const formats = {
 	snapshot : '{NAME}_{TAG}',
 	backup : {
-		full	: '{NAME}_{TAG}.full.btrfs.gz',
-		partial	: '{NAME}_{PARENT_TAG}_{TAG}.btrfs.gz',
+		full		: '{NAME}_{TAG}.full.btrfs.xz',
+		fullgz		: '{NAME}_{TAG}.full.btrfs.gz',  // nb: legacy format
+		partial		: '{NAME}_{PARENT_TAG}_{TAG}.btrfs.xz',
+		partialgz	: '{NAME}_{PARENT_TAG}_{TAG}.btrfs.gz',  // nb: legacy format
 		partialIdxs : {
 			tag		: 2,
 			parent	: 1,
@@ -46,22 +48,22 @@ const commands = {
 	backup : {
 		full : {
 			direct : {
-				regular	: "btrfs send '{SRC}' | pigz -c -9 > '{DST_FILE}'",
-				sudo	: "sudo btrfs send '{SRC}' | pigz -c -9 | sudo tee '{DST_FILE}' > /dev/null",
+				regular	: "btrfs send '{SRC}' | xz -T0 -c -3 > '{DST_FILE}'",
+				sudo	: "sudo btrfs send '{SRC}' | xz -T0 -c -3 | sudo tee '{DST_FILE}' > /dev/null",
 			},
 			tee : {
-				regular	: "btrfs send '{SRC}' | pigz -c -9 | tee '{DST_FILE}' | gunzip -c | btrfs receive '{DST_SNAP_DIR}'",
-				sudo	: "sudo btrfs send '{SRC}' | pigz -c -9 | sudo tee '{DST_FILE}' | gunzip -c | sudo btrfs receive '{DST_SNAP_DIR}'",
+				regular	: "btrfs send '{SRC}' | xz -T0 -c -3 | tee '{DST_FILE}' | xz -d | btrfs receive '{DST_SNAP_DIR}'",
+				sudo	: "sudo btrfs send '{SRC}' | xz -T0 -c -3 | sudo tee '{DST_FILE}' | xz -d | sudo btrfs receive '{DST_SNAP_DIR}'",
 			},
 		},
 		partial : {
 			direct : {
-				regular	: "btrfs send -p '{PARENT}' '{SRC}' | pigz -c -9 > '{DST_FILE}'",
-				sudo	: "sudo btrfs send -p '{PARENT}' '{SRC}' | pigz -c -9 | sudo tee '{DST_FILE}' > /dev/null",
+				regular	: "btrfs send -p '{PARENT}' '{SRC}' | xz -T0 -c -3 > '{DST_FILE}'",
+				sudo	: "sudo btrfs send -p '{PARENT}' '{SRC}' | xz -T0 -c -3 | sudo tee '{DST_FILE}' > /dev/null",
 			},
 			tee : {
-				regular	: "btrfs send -p '{PARENT}' '{SRC}' | pigz -c -9 | tee '{DST_FILE}' | gunzip -c | btrfs receive '{DST_SNAP_DIR}'",
-				sudo	: "sudo btrfs send -p '{PARENT}' '{SRC}' | pigz -c -9 | sudo tee '{DST_FILE}' | gunzip -c | sudo btrfs receive '{DST_SNAP_DIR}'",
+				regular	: "btrfs send -p '{PARENT}' '{SRC}' | xz -T0 -c -3 | tee '{DST_FILE}' | xz -d | btrfs receive '{DST_SNAP_DIR}'",
+				sudo	: "sudo btrfs send -p '{PARENT}' '{SRC}' | xz -T0 -c -3 | sudo tee '{DST_FILE}' | xz -d | sudo btrfs receive '{DST_SNAP_DIR}'",
 			},
 		},
 	},
@@ -251,11 +253,16 @@ export async function listBackups(p:{ log:Log, name:string, dir:string, remoteSe
 
 	// Search for full & partial backups files
 	const patternFull = formats.backup.full.replace( '{NAME}', p.name ).replace( '{TAG}', common.tagPattern );
+	const patternFullgz = formats.backup.fullgz.replace( '{NAME}', p.name ).replace( '{TAG}', common.tagPattern );
 	const patternPartial = formats.backup.partial.replace( '{NAME}', p.name ).replace( '{TAG}', common.tagPattern ).replace( '{PARENT_TAG}', common.tagPattern );
-	const [ filesFull, filesPartial ] = await Promise.all([
+	const patternPartialgz = formats.backup.partialgz.replace( '{NAME}', p.name ).replace( '{TAG}', common.tagPattern ).replace( '{PARENT_TAG}', common.tagPattern );
+	const listOfListOfFiles = await Promise.all([
 							common.dirPattern({ log:p.log.child('full'), dir:p.dir, pattern:patternFull, remoteServer }),
-							common.dirPattern({ log:p.log.child('partial'), dir:p.dir, pattern:patternPartial, remoteServer }) ]);
-	const files = [].concat( filesFull ).concat( filesPartial ).map( name=>({ name, size:0 }) );
+							common.dirPattern({ log:p.log.child('fullgz'), dir:p.dir, pattern:patternFullgz, remoteServer }),
+							common.dirPattern({ log:p.log.child('partial'), dir:p.dir, pattern:patternPartial, remoteServer }),
+							common.dirPattern({ log:p.log.child('partialgz'), dir:p.dir, pattern:patternPartialgz, remoteServer }),
+						]);
+	const files = <{name:string,size:number}[]>Array.prototype.concat.apply( [], listOfListOfFiles ).map( name=>({ name, size:0 }) );
 
 	// Get file sizes
 	if( p.remoteServer != null )
@@ -278,29 +285,47 @@ export async function createBackupsList(p:{ log:Log, name:string, files:{name:st
 	const remoteServer	= p.remoteServer == null ? null : p.remoteServer;  // NB: so they're 'null' and not 'undefined'
 	const containerDir	= p.containerDir == null ? null : p.containerDir;
 
-	const patternName = p.name.replace( /\./g, '\\.' );
-	const patternFull		= formats.backup.full	.replace( /\./g, '\\.' ).replace( '{NAME}', patternName ).replace( '{TAG}', `(${common.tagPatternRegex})` );
-	const patternPartial	= formats.backup.partial.replace( /\./g, '\\.' ).replace( '{NAME}', patternName ).replace( '{TAG}', `(${common.tagPatternRegex})` ).replace( '{PARENT_TAG}', `(${common.tagPatternRegex})` );
-	const regexFull		= new RegExp( patternFull );
-	const regexPartial	= new RegExp( patternPartial );
+	const regexps = [
+						{ pattern:formats.backup.full		, isPartial:false },
+						{ pattern:formats.backup.fullgz		, isPartial:false },
+						{ pattern:formats.backup.partial	, isPartial:true },
+						{ pattern:formats.backup.partialgz	, isPartial:true },
+					].map( item=>
+						{
+							const patternName = p.name.replace( /\./g, '\\.' );
+							let pattern = item.pattern	.replace( /\./g, '\\.' )
+														.replace( '{NAME}', patternName )
+														.replace( '{TAG}', `(${common.tagPatternRegex})` );
+							if( item.isPartial )
+								pattern = pattern		.replace( '{PARENT_TAG}', `(${common.tagPatternRegex})` );
+							return {	regex:new RegExp( pattern ),
+										isPartial:item.isPartial };
+						} );
 	const files = p.files	.map( file=>
 								{
-									const fullMatch = file.name.match( regexFull );
-									if( fullMatch != null )
-										return {	name		: file.name,
-													size		: file.size,
-													isFull		: true,
-													tag			: fullMatch[1],
-													parentTag	: <string>null };
+									for( const item of regexps )
+									{
+										const match = file.name.match( item.regex );
+										if( match == null )
+											continue;
 
-									const partialMatch = file.name.match( regexPartial );
-									if( partialMatch != null )
-										return {	name		: file.name,
-													size		: file.size,
-													isFull		: false,
-													tag			: partialMatch[formats.backup.partialIdxs.tag],
-													parentTag	: partialMatch[formats.backup.partialIdxs.parent] };
-
+										if(! item.isPartial )
+										{
+											return {	name		: file.name,
+														size		: file.size,
+														isFull		: true,
+														tag			: match[1],
+														parentTag	: <string>null };
+										}
+										else // !isPartial
+										{
+											return {	name		: file.name,
+														size		: file.size,
+														isFull		: false,
+														tag			: match[formats.backup.partialIdxs.tag],
+														parentTag	: match[formats.backup.partialIdxs.parent] };
+										}
+									}
 									// Not using this file
 									return null;
 								} )
