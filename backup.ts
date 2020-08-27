@@ -218,6 +218,8 @@ async function snapshotsRotation_keepOnlyLastX(p:{ log:Log, name:string, dir:str
 export function snapshotsRotation_keep3Days(p:{ log:Log, name:string, dir:string }) : Promise<void>		{ return snapshotsRotation_keepNXXX({ log:p.log, name:p.name, dir:p.dir, nDays:3 }); }
 export function snapshotsRotation_keep5Days(p:{ log:Log, name:string, dir:string }) : Promise<void>		{ return snapshotsRotation_keepNXXX({ log:p.log, name:p.name, dir:p.dir, nDays:5 }); }
 export function snapshotsRotation_keep1Week(p:{ log:Log, name:string, dir:string }) : Promise<void>		{ return snapshotsRotation_keepNXXX({ log:p.log, name:p.name, dir:p.dir, nDays:7 }); }
+export function snapshotsRotation_keep2Week(p:{ log:Log, name:string, dir:string }) : Promise<void>		{ return snapshotsRotation_keepNXXX({ log:p.log, name:p.name, dir:p.dir, nDays:14 }); }
+export function snapshotsRotation_keep3Week(p:{ log:Log, name:string, dir:string }) : Promise<void>		{ return snapshotsRotation_keepNXXX({ log:p.log, name:p.name, dir:p.dir, nDays:21 }); }
 export function snapshotsRotation_keep1Month(p:{ log:Log, name:string, dir:string }) : Promise<void>	{ return snapshotsRotation_keepNXXX({ log:p.log, name:p.name, dir:p.dir, nMonths:1 }); }
 export function snapshotsRotation_keep2Months(p:{ log:Log, name:string, dir:string }) : Promise<void>	{ return snapshotsRotation_keepNXXX({ log:p.log, name:p.name, dir:p.dir, nMonths:2 }); }
 export function snapshotsRotation_keep3Months(p:{ log:Log, name:string, dir:string }) : Promise<void>	{ return snapshotsRotation_keepNXXX({ log:p.log, name:p.name, dir:p.dir, nMonths:3 }); }
