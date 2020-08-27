@@ -295,6 +295,20 @@ export async function readFile(p:{ filePath:string }) : Promise<string>
 		} );
 }
 
+export async function writeFile(p:{ filePath:string, stringContent:string }) : Promise<void>
+{
+	return new Promise<void>( (resolve,reject)=>
+		{
+			fs.writeFile( p.filePath, p.stringContent, (err)=>
+			{
+				if( err )
+					reject( err );
+				else
+					resolve();
+			} );
+		} );
+}
+
 /** https://json5.org/ */
 export async function readJSON<T>(p:{ filePath?:string, jsonText?:string }) : Promise<T>
 {
@@ -307,6 +321,12 @@ export async function readJSON<T>(p:{ filePath?:string, jsonText?:string }) : Pr
 		throw `'readJSON()': Missing JSON source`;
 
 	return JSON5.parse( jsonText );
+}
+
+export async function writeJSON(p:{ filePath:string, content:any }) : Promise<void>
+{
+	const json = JSON.stringify( p.content, null, '\t' );
+	await writeFile({ filePath:p.filePath, stringContent:json });
 }
 
 /** https://stackoverflow.com/questions/10420352/converting-file-size-in-bytes-to-human-readable-string */

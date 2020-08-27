@@ -1,64 +1,53 @@
 
+import * as JSON5 from 'json5';
+
 import Log from './logger';
 import * as common from './common';
-import * as bosun from './bosun';
 
 export const config = {  // NB: exported variables are constants => Need a container ; cf. https://github.com/Microsoft/TypeScript/issues/6751
 	useSudo	: false,
 	debug	: false,
-	metrics	: {
-				btrfs : 'CHANGEME.btrfsstat',
-				smart : 'CHANGEME.smartinfo',
-			},
 };
 
 const commands = {
-	smartctl		: 'smartctl --attributes /dev/{DISK}',
-	btrfsDevStats	: 'btrfs dev stats {SUBVOLUME}',
+	sensors				: '/usr/bin/sensors -j',
+	diskstats			: 'cat /proc/diskstats',
+	smartctl			: 'smartctl --attributes /dev/{DISK}',
+	diskStandbyStatus	: 'hdparm -C {DRIVES}',
+	diskSpinDown		: 'hdparm -y {DRIVES}',
+	btrfsDevStats		: 'btrfs dev stats {SUBVOLUME}',
 };
 
-export async function sendDisksHealthToBosun(p:{ log:Log, disksPattern:string, btrfsSubvolumes:string[] }) : Promise<void>
+export async function getSensorsValues(p:{ log:Log }) : Promise<{[key:string]:{[key:string]:{[key:string]:number}}}>
 {
-	p.log.log( 'Get BTRFS subvolumes states' );
-	const btrfsStatsTasks = p.btrfsSubvolumes.map( subvolume=>getBtrfsStats(p.log.child(subvolume), subvolume) );
+	const {stdout} = await common.run({ log:p.log, command:commands.sensors });
+	return JSON5.parse( stdout );
+}
 
-	p.log.log( 'Get disks list' );
-	const disks = await common.dirPattern({ log:p.log.child('ls-disks'), dir:'/dev', pattern:'sd?' });
-	p.log.log( 'Get disks SMART state' );
-	const smartTasks = disks.map( async disk=>({ disk, values:await getSmartInfo(p.log.child(disk), disk) }) );
+export async function getDisksStats(log:Log) : Promise<{[dev:string]:{reads:number,writes:number}}>
+{
+	const {stdout} = await common.run({ log:log.child('run'), command:commands.diskstats });
+	const lines = stdout.split( /\r?\n\r?/ );
 
-	const bosunItems : bosun.Item[] = [];
-	p.log.log( 'Create Bosun items from BTRFS states' );
-	const timestamp = bosun.createTimeStampFromTag();
-	( await Promise.all(btrfsStatsTasks) ).forEach( l=>l.forEach( v=>
-		{
-			const item = bosun.createItem({ timestamp, metric:config.metrics.btrfs, value:v.value })
-			item.tags['disk'] = v.disk;
-			item.tags['name'] = v.metric;
-			bosunItems.push( item );
-		} ) );
-
-	p.log.log( 'Create Bosun items from SMART states' );
-	( await Promise.all(smartTasks) ).forEach( v=>
-		{
-			Object.keys(v.values).forEach( key=>
-				{
-					const item = bosun.createItem({ timestamp, metric:config.metrics.smart, value:v.values[key] });
-					if( item.value == null )
-						return;
-					item.tags['disk'] = v.disk;
-					item.tags['name'] = key;
-					bosunItems.push( item );
-				} );
-		} );
-
-	if( bosunItems.length == 0 )
+	const stats : {[dev:string]:{reads:number,writes:number}} = {};
+	for( const line of lines )
 	{
-		p.log.log( 'Nothing to log ...' );
-		return;
-	}
+		const tokens = line.split( / +/ );
+		if( tokens[0].length == 0 )
+			// The first element is always an empty string because of the spaces used to align the first column => Remove it
+			tokens.shift();
 
-	await bosun.send( p.log.child('bosun'), bosunItems );
+		// cf. https://www.kernel.org/doc/Documentation/ABI/testing/procfs-diskstats
+		const dev		= tokens[ 2 ];
+		const reads		= parseFloat( tokens[5] );  // sectors read
+		const writes	= parseFloat( tokens[9] );  // sectors written
+		if( dev == null )
+			// Last line is empty ...
+			continue;
+
+		stats[ dev ] = { reads, writes };
+	}
+	return stats;
 }
 
 export async function getSmartInfo(log:Log, disk:string) : Promise<{temperature:number,startStopCount:number,reallocatedSectors:number,pendingSectors:number,uncorrectableSectors:number}>
@@ -109,6 +98,47 @@ export async function getSmartInfo(log:Log, disk:string) : Promise<{temperature:
 	return item;
 }
 
+export async function getDiskStandbyStatus(log:Log, drives:string[]) : Promise<{[drive:string]:{standby:boolean}}>
+{
+	const driveString = drives.map( v=>'/dev/'+v ).join( ' ' );
+	const {stdout} = await common.run({ log:log.child('run'), command:(config.useSudo?'sudo ':'')+commands.diskStandbyStatus, 'DRIVES':driveString });
+
+	const lines = stdout.split( /\r?\n\r?/ );
+	let newSection = true;
+	let currentDriveName : string;
+	const drivesStatus : {[drive:string]:{standby:boolean}} = {};
+	for( const line of lines )
+	{
+		if( line.length == 0 )
+		{
+			// Emtpy line => Beginning a new section
+			newSection = true;
+			continue;  // Next line
+		}
+
+		if( newSection )
+		{
+			// First line of a section => currentSectionName
+			currentDriveName = line	.replace( /:.*/g, '' )
+									.replace( /.*\//g, '' );
+			newSection = false;
+			continue;  // Next line
+		}
+
+		const state = line.replace( /.* /g, '' );
+		const value = (state == 'standby') ? true : false;
+		drivesStatus[ currentDriveName ] = { standby:value };
+	}
+	return drivesStatus;
+}
+
+export async function spinDownDisks(p:{ log:Log, drives:string[] }) : Promise<void>
+{
+	const driveString = p.drives.map( v=>'/dev/'+v ).join( ' ' );
+	p.log.log( `spinDownDisk '${driveString}'` );
+	await common.run({ log:p.log.child('run'), command:(config.useSudo?'sudo ':'')+commands.diskSpinDown, 'DRIVES':driveString });
+}
+
 export async function getBtrfsStats(log:Log, subvolume:string) : Promise<{disk:string,metric:string,value:number}[]>
 {
 	const command = (config.useSudo?'sudo ':'')+commands.btrfsDevStats;
@@ -128,7 +158,7 @@ export async function getBtrfsStats(log:Log, subvolume:string) : Promise<{disk:s
 		const value = parseFloat( match[3] );
 
 		const item = { disk, metric, value };
-		log.log( item );
+		log.log( JSON.stringify(item) );
 		items.push( item );
 	}
 

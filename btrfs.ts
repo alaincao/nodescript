@@ -21,6 +21,8 @@ export const formats = {
 	},
 };
 const commands = {
+	fishow : "btrfs filesystem show '{MOUNTPOINT}'",
+	driveName : "lsblk -no pkname {DEVICEPATH}",  // Returns the name of the drive containing the specified partition ; e.g. for DEVICEPATH='/dev/sda1' => will return 'sda'
 	balance : {
 		complete	: "btrfs balance start '{MOUNTPOINT}'",
 		fast		: "btrfs balance start -dusage=50 -musage=50 '{MOUNTPOINT}'",
@@ -68,6 +70,43 @@ const commands = {
 		},
 	},
 };
+
+/** List the drives used by a filesystem's pool */
+export async function getPoolDrives(p:{ log:Log, mountPoint:string, diskNameOnly?:boolean }) : Promise<string[]>
+{
+	p.log.log( 'Start' );
+	const {stdout} = await common.run({ log:p.log, command:(config.useSudo?'sudo ':'')+commands.fishow, 'MOUNTPOINT':p.mountPoint });
+	const lines = stdout.split( /\r?\n\r?/ );
+
+	let drives : string[] = [];
+	for( const line of lines )
+	{
+		if(! line.trimLeft().startsWith('devid') )
+			// Not device listing line
+			continue;
+		const tokens = line.split( ' ' );
+		drives.push( tokens[tokens.length-1] );  // Last token of the line is the drive name
+	}
+
+	if( (p.diskNameOnly == true) )
+	{
+		// If partitions are used, get the name of the drives containing those partitions  (e.g. '/dev/sda1' => 'sda')
+		const tasks = drives.map( async devicePath=>
+			{
+				const {stdout} = await common.run({ log:p.log.child(`lsblk_${path.basename(devicePath)}`), command:(config.useSudo?'sudo ':'')+commands.driveName, 'DEVICEPATH':devicePath })
+				return stdout.trim();
+			} );
+		drives = await Promise.all( tasks );
+	}
+	else
+	{
+		// Extract the device name from the paths (e.g. '/dev/sda1' => 'sda1')
+		drives = drives.map( v=>path.basename(v) );
+	}
+
+	p.log.log( 'End' );
+	return drives;
+}
 
 export async function balance(p:{ log:Log, type:'complete'|'fast'|'fastpartial', mountPoint:string }) : Promise<void>
 {

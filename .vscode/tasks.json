@@ -21,6 +21,15 @@
 			"options": {}
 		},
 		{
+			"label": "build & run test.js",
+			"group": "test",
+			"type": "shell",
+			"problemMatcher": [],
+			"command": "./node_modules/.bin/gulp test.js && ./test.js|code -",
+			"args": [],
+			"options": {}
+		},
+		{
 			"type": "gulp",
 			"task": "clean",
 			"problemMatcher": []
