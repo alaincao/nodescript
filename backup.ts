@@ -295,6 +295,7 @@ export async function snapshotsRotation_timeMachine(p:{ log:Log, name:string, di
 export async function backupsRotation_keep1Full(p:{ log:Log, name:string, dir:string }) : Promise<void>		{ await backupsRotation_keepNFulls({ log:p.log, name:p.name, dir:p.dir, nToKeep:1 }); }
 export async function backupsRotation_keep2Fulls(p:{ log:Log, name:string, dir:string }) : Promise<void>	{ await backupsRotation_keepNFulls({ log:p.log, name:p.name, dir:p.dir, nToKeep:2 }); }
 export async function backupsRotation_keep3Fulls(p:{ log:Log, name:string, dir:string }) : Promise<void>	{ await backupsRotation_keepNFulls({ log:p.log, name:p.name, dir:p.dir, nToKeep:3 }); }
+export async function backupsRotation_keep4Fulls(p:{ log:Log, name:string, dir:string }) : Promise<void>	{ await backupsRotation_keepNFulls({ log:p.log, name:p.name, dir:p.dir, nToKeep:4 }); }
 export async function backupsRotation_keep5Fulls(p:{ log:Log, name:string, dir:string }) : Promise<void>	{ await backupsRotation_keepNFulls({ log:p.log, name:p.name, dir:p.dir, nToKeep:5 }); }
 export async function backupsRotation_keep10Fulls(p:{ log:Log, name:string, dir:string }) : Promise<void>	{ await backupsRotation_keepNFulls({ log:p.log, name:p.name, dir:p.dir, nToKeep:10 }); }
 export async function backupsRotation_keep15Fulls(p:{ log:Log, name:string, dir:string }) : Promise<void>	{ await backupsRotation_keepNFulls({ log:p.log, name:p.name, dir:p.dir, nToKeep:15 }); }
@@ -324,6 +325,8 @@ async function backupsRotation_keepNFulls(p:{ log:Log, name:string, dir:string, 
 
 export function backupsRotation_keepAtLeast3Days(p:{ log:Log, name:string, dir:string }) : Promise<void>	{ return backupsRotation_keepAtLeastNDays({ log:p.log, name:p.name, dir:p.dir, daysToKeep:3 }); }
 export function backupsRotation_keepAtLeast7Days(p:{ log:Log, name:string, dir:string }) : Promise<void>	{ return backupsRotation_keepAtLeastNDays({ log:p.log, name:p.name, dir:p.dir, daysToKeep:7 }); }
+export function backupsRotation_keepAtLeast14Days(p:{ log:Log, name:string, dir:string }) : Promise<void>	{ return backupsRotation_keepAtLeastNDays({ log:p.log, name:p.name, dir:p.dir, daysToKeep:14 }); }
+export function backupsRotation_keepAtLeast21Days(p:{ log:Log, name:string, dir:string }) : Promise<void>	{ return backupsRotation_keepAtLeastNDays({ log:p.log, name:p.name, dir:p.dir, daysToKeep:21 }); }
 export function backupsRotation_keepAtLeast1Month(p:{ log:Log, name:string, dir:string }) : Promise<void>	{ return backupsRotation_keepAtLeastNDays({ log:p.log, name:p.name, dir:p.dir, monthsToKeep:1 }); }
 export function backupsRotation_keepAtLeast2Months(p:{ log:Log, name:string, dir:string }) : Promise<void>	{ return backupsRotation_keepAtLeastNDays({ log:p.log, name:p.name, dir:p.dir, monthsToKeep:2 }); }
 export function backupsRotation_keepAtLeast3Months(p:{ log:Log, name:string, dir:string }) : Promise<void>	{ return backupsRotation_keepAtLeastNDays({ log:p.log, name:p.name, dir:p.dir, monthsToKeep:3 }); }
