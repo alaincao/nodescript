@@ -1,0 +1,5 @@
+
+# Things added to the ~/.bashrc file:
+
+# Append git status to prompt
+export PS1=${PS1%???}' $(__git_ps1 "%s")\$ '
