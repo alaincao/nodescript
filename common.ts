@@ -179,7 +179,9 @@ export async function dirPattern(p:{ log:Log, dir:string, pattern:string, remote
 	}
 }
 
-export function stat(p:{ dir?:string, name?:string, path?:string }) : Promise<fs.Stats>
+type DirNameOrPath = { path :string,	dir?:never,	name?:never }
+					| { path?:never,	dir :string,name :string };
+export function stat(p:DirNameOrPath) : Promise<fs.Stats>
 {
 	const path_ = (p.path != null) ? p.path : path.join( p.dir, p.name );
 	return new Promise<fs.Stats>( (resolve,reject)=>
@@ -194,7 +196,7 @@ export function stat(p:{ dir?:string, name?:string, path?:string }) : Promise<fs
 		} );
 }
 
-export function exists(p:{ dir?:string, name?:string, path?:string }) : Promise<boolean>
+export function exists(p:DirNameOrPath) : Promise<boolean>
 {
 	const path_ = (p.path != null) ? p.path : path.join( p.dir, p.name );
 	return new Promise<boolean>( (resolve)=>
@@ -217,7 +219,7 @@ export function mv(p:{ srcPath:string, dstPath:string }) : Promise<void>
 		} );
 }
 
-export function mkdir(p:{ dir?:string, name?:string, path?:string }) : Promise<void>
+export function mkdir(p:DirNameOrPath) : Promise<void>
 {
 	const path_ = (p.path != null) ? p.path : path.join( p.dir, p.name );
 	return new Promise<void>( (resolve,reject)=>
@@ -229,7 +231,7 @@ export function mkdir(p:{ dir?:string, name?:string, path?:string }) : Promise<v
 		} )
 }
 
-export function rm(p:{ dir?:string, name?:string, path?:string }) : Promise<void>
+export function rm(p:DirNameOrPath) : Promise<void>
 {
 	const path_ = (p.path != null) ? p.path : path.join( p.dir, p.name );
 	return new Promise<void>( (resolve,reject)=>
@@ -244,7 +246,7 @@ export function rm(p:{ dir?:string, name?:string, path?:string }) : Promise<void
 		} );
 }
 
-export function rmdir(p:{ dir?:string, name?:string, path?:string }) : Promise<void>
+export function rmdir(p:DirNameOrPath) : Promise<void>
 {
 	const path_ = (p.path != null) ? p.path : path.join( p.dir, p.name );
 	return new Promise<void>( (resolve,reject)=>
@@ -256,7 +258,7 @@ export function rmdir(p:{ dir?:string, name?:string, path?:string }) : Promise<v
 		} );
 }
 
-export async function rmrf(p:{ dir?:string, name?:string, path?:string }) : Promise<void>
+export async function rmrf(p:DirNameOrPath) : Promise<void>
 {
 	const path_ = (p.path != null) ? p.path : path.join( p.dir, p.name );
 	const stat_ = await stat( p );
@@ -354,7 +356,7 @@ export async function readFileLines(filePath:string) : Promise<string[]>
 {
 	const buffer = await fs.promises.readFile( filePath );
 	const txt = buffer.toString();
-	const lines : string[] = txt.match( /[^\r\n]+/g );
+	const lines = txt.match( /[^\r\n]+/g ) ?? [];
 	return lines;
 }
 
@@ -604,8 +606,8 @@ export namespace html
 	{
 		$triggerControl.contextmenu( ()=>
 			{
-				let clickHandler	: (evt:any)=>void = null;
-				let closeMe			: ()=>void = null;
+				let clickHandler	: (evt:any)=>void = <any>null;
+				let closeMe			: ()=>void = <any>null;
 
 				const $popup = $('<div style="z-index:999;position:absolute;padding:1px;background-color:white;border:1px solid black"></div>');
 				items.forEach( item=>
@@ -752,12 +754,10 @@ export namespace events
 	{
 		return function(callback:(p:T)=>void, pp?:{executeOnce?:boolean}) : Self
 		{
-			if( pp == null )  pp = {};
-
 			var handler : (evt:any,p:T)=>void;
 			handler = function(evt:any,p:T)
 				{
-					if( pp.executeOnce == true )
+					if( pp?.executeOnce == true )
 						// Unregister myself
 						events.unbind( eventName, handler );
 

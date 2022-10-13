@@ -181,7 +181,7 @@ export async function backupCreate(p:{ log:Log, snapshot:SnapshotEntry, parent?:
 {
 	p.log.log( 'Start' );
 	let command : string;
-	let parentSubvolume : string;
+	let parentSubvolume : string|null;
 	let dstFilePath : string;
 	if( p.parent == null )
 	{
@@ -234,9 +234,9 @@ export async function backupCreate(p:{ log:Log, snapshot:SnapshotEntry, parent?:
 	p.log.log( 'End' );
 }
 
-export async function listSnapshots(p:{ log:Log, name:string, dir:string, remoteServer?:string }) : Promise<{first:SnapshotEntry,last:SnapshotEntry,list:SnapshotEntry[]}>
+export async function listSnapshots(p:{ log:Log, name:string, dir:string, remoteServer?:string }) : Promise<{first?:SnapshotEntry,last?:SnapshotEntry,list:SnapshotEntry[]}>
 {
-	const remoteServer = p.remoteServer == null ? null : p.remoteServer;
+	const remoteServer = p.remoteServer == null ? undefined : p.remoteServer;
 	const pattern = formats.snapshot.replace( '{NAME}', p.name ).replace( '{TAG}', common.tagPattern );
 	const subvolumes = await common.dirPattern({ log:p.log, dir:p.dir, pattern:pattern, remoteServer });
 	subvolumes.sort();  // NB: Sort so dates can be evaluated chronologically
@@ -276,8 +276,8 @@ export async function listSnapshots(p:{ log:Log, name:string, dir:string, remote
 			return e;
 		} );
 
-	let first : SnapshotEntry = null;
-	let last : SnapshotEntry = null;
+	let first : SnapshotEntry|undefined = undefined;
+	let last : SnapshotEntry|undefined = undefined;
 	if( list.length > 0 )
 	{
 		first = list[0];
@@ -286,20 +286,18 @@ export async function listSnapshots(p:{ log:Log, name:string, dir:string, remote
 	return { first, last, list };
 }
 
-export async function listBackups(p:{ log:Log, name:string, dir:string, remoteServer?:string }) : Promise<{ last:BackupEntry, lastFull:BackupEntry, list:BackupEntry[] }>
+export async function listBackups(p:{ log:Log, name:string, dir:string, remoteServer?:string }) : Promise<{ last:BackupEntry, lastFull?:BackupEntry, list:BackupEntry[] }>
 {
-	const remoteServer = p.remoteServer == null ? null : p.remoteServer;
-
 	// Search for full & partial backups files
 	const patternFull = formats.backup.full.replace( '{NAME}', p.name ).replace( '{TAG}', common.tagPattern );
 	const patternFullgz = formats.backup.fullgz.replace( '{NAME}', p.name ).replace( '{TAG}', common.tagPattern );
 	const patternPartial = formats.backup.partial.replace( '{NAME}', p.name ).replace( '{TAG}', common.tagPattern ).replace( '{PARENT_TAG}', common.tagPattern );
 	const patternPartialgz = formats.backup.partialgz.replace( '{NAME}', p.name ).replace( '{TAG}', common.tagPattern ).replace( '{PARENT_TAG}', common.tagPattern );
 	const listOfListOfFiles = await Promise.all([
-							common.dirPattern({ log:p.log.child('full'), dir:p.dir, pattern:patternFull, remoteServer }),
-							common.dirPattern({ log:p.log.child('fullgz'), dir:p.dir, pattern:patternFullgz, remoteServer }),
-							common.dirPattern({ log:p.log.child('partial'), dir:p.dir, pattern:patternPartial, remoteServer }),
-							common.dirPattern({ log:p.log.child('partialgz'), dir:p.dir, pattern:patternPartialgz, remoteServer }),
+							common.dirPattern({ log:p.log.child('full'), dir:p.dir, pattern:patternFull, remoteServer:p.remoteServer }),
+							common.dirPattern({ log:p.log.child('fullgz'), dir:p.dir, pattern:patternFullgz, remoteServer:p.remoteServer }),
+							common.dirPattern({ log:p.log.child('partial'), dir:p.dir, pattern:patternPartial, remoteServer:p.remoteServer }),
+							common.dirPattern({ log:p.log.child('partialgz'), dir:p.dir, pattern:patternPartialgz, remoteServer:p.remoteServer }),
 						]);
 	const files = <{name:string,size:number}[]>Array.prototype.concat.apply( [], listOfListOfFiles ).map( name=>({ name, size:0 }) );
 
@@ -319,10 +317,10 @@ export async function listBackups(p:{ log:Log, name:string, dir:string, remoteSe
 	return createBackupsList({ log:p.log, name:p.name, containerDir:p.dir, remoteServer:p.remoteServer, files });
 }
 
-export async function createBackupsList(p:{ log:Log, name:string, files:{name:string,size:number}[], containerDir?:string, remoteServer?:string }) : Promise<{ last:BackupEntry, lastFull:BackupEntry, list:BackupEntry[] }>
+export async function createBackupsList(p:{ log:Log, name:string, files:{name:string,size:number}[], containerDir:string, remoteServer?:string }) : Promise<{ last:BackupEntry, lastFull?:BackupEntry, list:BackupEntry[] }>
 {
-	const remoteServer	= p.remoteServer == null ? null : p.remoteServer;  // NB: so they're 'null' and not 'undefined'
-	const containerDir	= p.containerDir == null ? null : p.containerDir;
+	const remoteServer	= p.remoteServer??undefined;
+	const containerDir	= p.containerDir;
 
 	const regexps = [
 						{ pattern:formats.backup.full		, isPartial:false },
@@ -354,7 +352,7 @@ export async function createBackupsList(p:{ log:Log, name:string, files:{name:st
 														size		: file.size,
 														isFull		: true,
 														tag			: match[1],
-														parentTag	: <string>null };
+														parentTag	: <string|undefined>undefined };
 										}
 										else // !isPartial
 										{
@@ -366,7 +364,7 @@ export async function createBackupsList(p:{ log:Log, name:string, files:{name:st
 										}
 									}
 									// Not using this file
-									return null;
+									return null!;
 								} )
 							.filter( v=>v != null );
 	files.sort( (a,b)=>  // NB: Sort so dates can be evaluated chronologically
@@ -375,22 +373,24 @@ export async function createBackupsList(p:{ log:Log, name:string, files:{name:st
 		} );
 
 	const list : BackupEntry[] = [];
-	let last : BackupEntry = null;
-	let lastFull : BackupEntry = null;
+	let last : BackupEntry = undefined!;
+	let lastFull : BackupEntry|undefined = undefined;
 	let currentFullNumber : number = 0;
 	for( let i=0; i<files.length; ++i )
 	{
 		const file = files[i];
 		let fullNumber : number;
+		let parent : BackupEntry|undefined;
+		let sizeCumulated : number;
 		if( file.isFull )
 		{
 			fullNumber = ( ++ currentFullNumber );
-			var parent = <BackupEntry>null;
-			var sizeCumulated = <number>null;
+			parent = undefined;
+			sizeCumulated = file.size;
 		}
 		else
 		{
-			var parent = list.find( (e)=>e.tag == file.parentTag );
+			parent = list.find( (e)=>e.tag == file.parentTag );
 			if( parent == null )
 				// NB: Should already exist in the list since 'files' should be sorted chronologically
 				throw "Could not find parent backup for '"+file.name+"'";
@@ -401,7 +401,7 @@ export async function createBackupsList(p:{ log:Log, name:string, files:{name:st
 				// Parent is full backup
 				sizeCumulated = file.size;
 			else
-				sizeCumulated = parent.sizeCumulated + file.size;
+				sizeCumulated = parent.sizeCumulated! + file.size;
 		}
 
 		const date	= moment( file.tag, common.tagFormat );
@@ -467,7 +467,7 @@ export class BackupEntry extends BaseEntry
 
 	public readonly parent?			: BackupEntry;
 	public readonly size			: number;
-	public readonly sizeCumulated?	: number;
+	public readonly sizeCumulated	: number;
 	public readonly fullNumber		: number;
 
 	public constructor(init?:BackupEntry)

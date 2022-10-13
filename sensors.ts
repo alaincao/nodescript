@@ -50,13 +50,13 @@ export async function getDisksStats(log:Log) : Promise<{[dev:string]:{reads:numb
 	return stats;
 }
 
-export async function getSmartInfo(log:Log, disk:string) : Promise<{temperature:number,startStopCount:number,reallocatedSectors:number,pendingSectors:number,uncorrectableSectors:number}>
+export async function getSmartInfo(log:Log, disk:string) : Promise<{temperature:number|null,startStopCount:number|null,reallocatedSectors:number|null,pendingSectors:number|null,uncorrectableSectors:number|null}>
 {
 	const command = (config.useSudo?'sudo ':'')+commands.smartctl;
 	const {stdout} = await common.run({ log, command, logstds:config.debug, 'DISK':disk });
 	const lines = stdout.split( /\r?\n\r?/ );
 
-	const item = {temperature:<number>null,startStopCount:<number>null,reallocatedSectors:<number>null,pendingSectors:<number>null,uncorrectableSectors:<number>null};
+	const item = {temperature:<number|null>null,startStopCount:<number|null>null,reallocatedSectors:<number|null>null,pendingSectors:<number|null>null,uncorrectableSectors:<number|null>null};
 	for( let i=0; i<lines.length; ++i )
 	{
 		const line = lines[i];
@@ -105,7 +105,7 @@ export async function getDiskStandbyStatus(log:Log, drives:string[]) : Promise<{
 
 	const lines = stdout.split( /\r?\n\r?/ );
 	let newSection = true;
-	let currentDriveName : string;
+	let currentDriveName : string = '<error>';
 	const drivesStatus : {[drive:string]:{standby:boolean}} = {};
 	for( const line of lines )
 	{
@@ -153,6 +153,8 @@ export async function getBtrfsStats(log:Log, subvolume:string) : Promise<{disk:s
 			continue;  // Discard any empty lines
 
 		const match = ( /^\[\/dev\/(.*)\].([a-z\_]+)\s+(\d+)$/g ).exec( line );
+		if( match == null )
+			throw `getBtrfsStats: regexp failed`;
 		const disk = match[1];
 		const metric = match[2];
 		const value = parseFloat( match[3] );

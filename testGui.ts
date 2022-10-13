@@ -17,7 +17,7 @@ export var config : {
 					};
 export var $blockingDiv : JQuery;
 export var log : Log;
-export var koHelloWho	: KnockoutObservable<string>;
+export var koHelloWho	: KnockoutObservable<string|null>;
 
 export async function main(p:{
 							$blockingDiv	: JQuery,
@@ -25,7 +25,7 @@ export async function main(p:{
 						}) : Promise<void>
 {
 	self = this;
-	log = new Log( 'gui', /*parent*/null, /*onLineAdded*/(name,date,args)=>
+	log = new Log( 'gui', /*parent*/undefined, /*onLineAdded*/(name,date,args)=>
 		{
 			const a = args.slice();
 			a.unshift( `${moment(date).format('HH:mm:ss.SSS')} ${name}:` );
@@ -81,7 +81,7 @@ else
 	// Within Electron CLI => Open window
 	electron.app.once( 'ready', ()=>
 		{
-			log = new Log( 'electron', /*parent*/null, /*onLineAdded*/(name,date,args)=>
+			log = new Log( 'electron', /*parent*/undefined, /*onLineAdded*/(name,date,args)=>
 				{
 					const a = args.slice();
 					a.unshift( name+':' );

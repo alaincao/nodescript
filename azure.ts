@@ -4,11 +4,11 @@ import * as azure from 'azure-storage';
 import Log from './logger';
 import * as btrfs from './btrfs';
 
-export async function listBackups(p:{ log:Log, blobService:azure.BlobService, blobContainer:string, name:string }) : Promise<{ last:btrfs.BackupEntry, lastFull:btrfs.BackupEntry, list:btrfs.BackupEntry[] }>
+export async function listBackups(p:{ log:Log, blobService:azure.BlobService, blobContainer:string, name:string }) : Promise<{ last:btrfs.BackupEntry, lastFull?:btrfs.BackupEntry, list:btrfs.BackupEntry[] }>
 {
 	const blobs = await listBlobs({ log:p.log, blobService:p.blobService, blobContainer:p.blobContainer });
 	const files = blobs.map( blob=>({ name:blob.name, size:parseInt(blob.contentLength) }) );
-	return btrfs.createBackupsList({ log:p.log, name:p.name, files });
+	return btrfs.createBackupsList({ log:p.log, name:p.name, files, containerDir:'dummy' });
 }
 
 /** Either provide parameters ['path'] or ['dir'+'name'] to specify which file to upload */
@@ -72,7 +72,7 @@ export async function downloadFile(p:{ log:Log, blobService:azure.BlobService, b
 export async function listBlobs(p:{ log:Log, blobService:azure.BlobService, blobContainer:string, namePrefix?:string }) : Promise<azure.BlobService.BlobResult[]>
 {
 	let entries : azure.BlobService.BlobResult[] = [];
-	let token : azure.common.ContinuationToken = null;
+	let token : azure.common.ContinuationToken|undefined = undefined!;
 	p.log.log( `List blobs of container '${p.blobContainer}'` );
 	do
 	{
@@ -82,7 +82,7 @@ export async function listBlobs(p:{ log:Log, blobService:azure.BlobService, blob
 			// Use 'listBlobsSegmented'
 			task = new Promise<azure.BlobService.ListBlobsResult>( (resolve,reject)=>
 				{
-					p.blobService.listBlobsSegmented( p.blobContainer, token, null, (error,result)=>
+					p.blobService.listBlobsSegmented( p.blobContainer, token!, {}, (error,result)=>
 						{
 							if( error )
 							{
@@ -98,7 +98,7 @@ export async function listBlobs(p:{ log:Log, blobService:azure.BlobService, blob
 			// Use 'listBlobsSegmentedWithPrefix'
 			task = new Promise<azure.BlobService.ListBlobsResult>( (resolve,reject)=>
 				{
-					p.blobService.listBlobsSegmentedWithPrefix( p.blobContainer, p.namePrefix, token, null, (error,result)=>
+					p.blobService.listBlobsSegmentedWithPrefix( p.blobContainer, p.namePrefix!, token!, {}, (error,result)=>
 						{
 							if( error )
 							{

@@ -58,27 +58,27 @@ export async function runSendRequest(log:Log, item:SendRequest) : Promise<void>
 	if( srcs.list.length == 0 )
 		throw `There is no snapshot available for '${item.name}'`;
 
-	if( (dsts.last != null) && (srcs.last.tag == dsts.last.tag) )
+	if( (dsts.last != null) && (srcs.last!.tag == dsts.last.tag) )
 	{
-		log.log( `Nothing to do: last snapshot '${srcs.last.subvolumeName}' has already been sent to '${item.dstDir}'` );
+		log.log( `Nothing to do: last snapshot '${srcs.last!.subvolumeName}' has already been sent to '${item.dstDir}'` );
 		return;
 	}
 
-	let parent : btrfs.SnapshotEntry = null;
+	let parent : btrfs.SnapshotEntry|undefined = undefined;
 	if( dsts.last == null )
 	{
 		log.log( `No previous snapshots present in '${item.dstDir}' => Sending the full subvolume` );
 	}
 	else
 	{
-		parent = srcs.list.find( (e)=>(e.tag == dsts.last.tag) );
+		parent = srcs.list.find( (e)=>(e.tag == dsts.last!.tag) );
 		if( parent == null )
 			log.log( `*** WARNING *** Could not find parent snapshot '${dsts.last.subvolumeName}' in source directory '${item.srcDir}' => Sending the full subvolume` );
 		else
 			log.log( `Using parent subvolume '${parent.subvolumeName}'` );
 	}
 
-	await btrfs.send({ log:log, snapshot:srcs.last, parent:parent, destinationDir:item.dstDir });
+	await btrfs.send({ log:log, snapshot:srcs.last!, parent:parent, destinationDir:item.dstDir });
 
 	if( item.srcRemove === true )
 	{
@@ -106,30 +106,36 @@ export async function runBackupRequest(log:Log, item:BackupRequest) : Promise<vo
 
 	if( snapshots.first == null )
 		throw "There is no snapshot available for '"+item.name+"'";
+	const lastSnapshot = snapshots.last!;  // Assume not null: if there's a first, there is a last
 
-	let parentSnapshot : btrfs.SnapshotEntry;
+	let parentSnapshot : btrfs.SnapshotEntry|undefined;
 	if( backups.last == null )
 	{
 		log.log( 'Create a full backup: no backups available yet' );
-		parentSnapshot = null;
+		parentSnapshot = undefined;
 	}
 	else
 	{
-		if( snapshots.last.tag == backups.last.tag )
+		if( lastSnapshot.tag == backups.last.tag )
 		{
-			log.log( "Nothing to do: last snapshot '"+snapshots.last.subvolumeName+"' has already been backuped into '"+backups.last.backupName+"'" );
+			log.log( "Nothing to do: last snapshot '"+lastSnapshot.subvolumeName+"' has already been backuped into '"+backups.last.backupName+"'" );
 			return;
 		}
 
 		parentSnapshot = snapshots.list.find( (e)=>(e.tag == backups.last.tag) );
-		if( parentSnapshot == null )
+		if( backups.lastFull == null )
+		{
+			log.log( "Create a full backup: ERROR: could not find previous last full backup" );
+			parentSnapshot = undefined;
+		}
+		else if( parentSnapshot == null )
 		{
 			log.log( "Create a full backup: Could not find snapshot of last backup '"+backups.last.backupName+"'" );
 		}
 		else if( backups.lastFull.size < minIncrementalSize )
 		{
-			log.log( `Create a full backup: Last full backup size was '${common.humanFileSize(backups.last.size)}'` );
-			parentSnapshot = null;
+			log.log( `Create a full backup: Last full backup size was '${common.humanFileSize(backups.lastFull.size)}'` );
+			parentSnapshot = undefined;
 		}
 		else if(	(item.fullThreshold != null)
 				&&	(backups.last.sizeCumulated != null)
@@ -137,31 +143,32 @@ export async function runBackupRequest(log:Log, item:BackupRequest) : Promise<vo
 		{
 			// Cumulated size of the snapshots has reach threshold
 			log.log( `Create a full backup: Full backup size is '${common.humanFileSize(backups.lastFull.size)}' and cumulated snapshots size is '${common.humanFileSize(backups.last.sizeCumulated)}'` );
-			parentSnapshot = null;
+			parentSnapshot = undefined;
 		}
 		else if(	(item.fullMaxAgeDays != null)
 				&&	(backups.lastFull.diffDays >= item.fullMaxAgeDays) )
 		{
 			log.log( `Create a full backup: Last full backup too old (${backups.lastFull.tag})` );
-			parentSnapshot = null;
+			parentSnapshot = undefined;
 		}
 		else
 		{
 			log.log( "Create an incremental backup" );
 		}
 	}
+	let destinationSnapshotDir : string|undefined;
 	if( item.destinationSnapshot != null )
-		var destinationSnapshotDir = item.destinationSnapshot.dir;
+		destinationSnapshotDir = item.destinationSnapshot.dir;
 	else
-		destinationSnapshotDir = null;
-	await btrfs.backupCreate({ log:log, snapshot:snapshots.last, parent:parentSnapshot, subvolumeDestinationDir:destinationSnapshotDir, backupDestinationDir:item.destinationBackupsDir });
+		destinationSnapshotDir = undefined;
+	await btrfs.backupCreate({ log:log, snapshot:lastSnapshot, parent:parentSnapshot, subvolumeDestinationDir:destinationSnapshotDir, backupDestinationDir:item.destinationBackupsDir });
 
 	if( item.bosunMetric != null )
 	{
 		log.log( 'Send directory size to Bosun' );
 		if( item.sourceSnapshotServer != null )
 			throw 'NYI: Send remote directory size to bosun is not yet implemented!';
-		await bosun.sendDirSize({ log:log.child('bosun'), metric:item.bosunMetric, name:item.name, dir:path.join(snapshots.last.containerDir, snapshots.last.subvolumeName)  , timestamp:bosun.createTimeStampFromTag(snapshots.last.tag) });
+		await bosun.sendDirSize({ log:log.child('bosun'), metric:item.bosunMetric, name:item.name, dir:path.join(lastSnapshot.containerDir, lastSnapshot.subvolumeName)  , timestamp:bosun.createTimeStampFromTag(lastSnapshot.tag) });
 	}
 
 	if( item.sourceSnapshotsRemove )
@@ -232,7 +239,7 @@ async function snapshotsRotation_keepNXXX(p:{ log:Log, name:string, dir:string, 
 	entries.list.forEach( (entry, i)=>
 		{
 			let remove = true;
-			if( entry.tag == entries.last.tag )
+			if( entry.tag == entries.last!.tag )
 				// Always keep the last one (should not be needed, but there for safety ...)
 				remove = false;
 			
@@ -273,7 +280,7 @@ export async function snapshotsRotation_timeMachine(p:{ log:Log, name:string, di
 	entries.list.forEach( (entry, i)=>
 		{
 			let remove = true;
-			if( entry.tag == entries.last.tag )
+			if( entry.tag == entries.last!.tag )
 				// Always keep the last one (should not be needed, but there for safety ...)
 				remove = false;
 			if( entry.firstOfMonth )

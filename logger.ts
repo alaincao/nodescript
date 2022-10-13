@@ -1,19 +1,18 @@
 
 import * as moment from 'moment';
-import * as common from './common';
 
 class Log
 {
-	public readonly	parent		: Log;
+	public readonly	parent?		: Log;
 	public readonly	name		: string;
 	public readonly	nameFull	: string;
 	public readonly	lines		: LogLine[];
 
-	public readonly onLineAdded	: (name:string, date:Date, message:any[])=>void;
+	public readonly onLineAdded?: (name:string, date:Date, message:any[])=>void;
 
 	constructor(name:string, parent?:Log, onLineAdded?:(name:string, date:Date, message:any[])=>void)
 	{
-		this.parent = (parent == null) ? null : parent;
+		this.parent = parent;
 		this.name = name;
 		this.nameFull = this.getFullName();
 		this.lines = [];
@@ -77,18 +76,14 @@ class Log
 	private getFullName() : string
 	{
 		let name = this.name;
-		for( let l:Log = this.parent; l != null; l = l.parent )
+		for( let l = this.parent; l != null; l = l.parent )
 			name = l.name+'.'+name;
 		return name;
 	}
 }
 
-interface LogLine
-{
-	date		: Date;
-	message?	: any[];
-	child?		: Log
-}
+type LogLine = { date: Date,	message	: any[],	child?: never	}
+			 | { date: Date,	message?: never,	child : Log		}
 
 function dateString(d:Date) : string
 {

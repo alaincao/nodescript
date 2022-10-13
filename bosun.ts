@@ -6,7 +6,7 @@ import * as common from './common';
 import logger from './logger';
 
 export const config = {  // NB: exported variables are constants => Need a container ; cf. https://github.com/Microsoft/TypeScript/issues/6751
-		hostName		: <string>null,  // REQUIRED !
+		hostName		: <string|null>null,  // REQUIRED !
 		bosunHost		: 'UNSET',  // REQUIRED !
 		bosunHostInSSL	: false,
 		useSudo			: false,
