@@ -332,8 +332,10 @@ export async function writeJSON(p:{ filePath:string, content:any }) : Promise<vo
 }
 
 /** https://stackoverflow.com/questions/10420352/converting-file-size-in-bytes-to-human-readable-string */
-export function humanFileSize(bytes:number, si?:boolean) : string
+export function humanFileSize(bytes?:number, si?:boolean) : string|null
 {
+	if( bytes == null )
+		return null;
 	if( si == null )
 		si = false;
 	const thresh = si ? 1000 : 1024;

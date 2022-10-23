@@ -396,12 +396,7 @@ export async function createBackupsList(p:{ log:Log, name:string, files:{name:st
 				throw "Could not find parent backup for '"+file.name+"'";
 
 			fullNumber = parent.fullNumber;
-
-			if( parent.parent == null )
-				// Parent is full backup
-				sizeCumulated = file.size;
-			else
-				sizeCumulated = parent.sizeCumulated! + file.size;
+			sizeCumulated = parent.sizeCumulated + file.size;
 		}
 
 		const date	= moment( file.tag, common.tagFormat );
