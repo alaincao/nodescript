@@ -80,6 +80,12 @@ export async function runSendRequest(log:Log, item:SendRequest) : Promise<void>
 
 	await btrfs.send({ log:log, snapshot:srcs.last!, parent:parent, destinationDir:item.dstDir });
 
+	if( item.bosunMetric != null )
+	{
+		log.log( 'Send directory size to Bosun' );
+		await bosun.sendDirSize({ log:log.child('bosun'), metric:item.bosunMetric, name:item.name, dir:path.join(item.dstDir, srcs.last!.subvolumeName) , timestamp:bosun.createTimeStampFromTag(srcs.last!.tag) });
+	}
+
 	if( item.srcRemove === true )
 	{
 		log.log( 'Remove obsolete snapshots' );
@@ -409,6 +415,7 @@ export interface SendRequest
 	dstDir			: string;
 	srcRemove		: boolean;
 	dstRotation?	: SnapshotsRotation;
+	bosunMetric?	: string;
 }
 export interface BackupRequest
 {
