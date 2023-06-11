@@ -6,6 +6,16 @@ services:
       context: ./docker/
       args:
         - USER_NAME=aa
+    restart: "no"
+    ports:
+      - "5000:5000"
+    networks:
+      - internalnet
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.nodejs.entrypoints=internalweb"
+      - "traefik.http.routers.nodejs.rule=Host(`nodejs.testlocal.home`)"
+      - "traefik.http.services.nodejs.loadbalancer.server.port=5000"
     volumes:
       - "./:/home/aa/works/"
       - "/home/aa/.bash_aliases:/home/aa/.bash_aliases:ro"
@@ -16,3 +26,7 @@ services:
       - "/home/aa/.ssh/key.github.pub:/home/aa/.ssh/key.github.pub:ro"
       - "/home/aa/.ssh/key.gitea:/home/aa/.ssh/key.gitea:ro"
       - "/home/aa/.ssh/key.gitea.pub:/home/aa/.ssh/key.gitea.pub:ro"
+
+networks:
+  internalnet:
+    external: true

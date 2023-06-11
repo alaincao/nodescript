@@ -67,3 +67,13 @@ RUN set -ex \
  && sudo rm bashrc \
  && : "Done"
 WORKDIR /home/${USER_NAME}/works/
+
+RUN set -ex \
+ && : "Install nvm" \
+ && curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.3/install.sh | bash \
+ && : "Install node & npm" \
+ && bash -c "source ~/.nvm/nvm.sh && nvm install --lts" \
+ && : "Append 'node_modules/.bin/' to PATH" \
+ && echo 'export PATH=${PATH}:"${HOME}/works/node_modules/.bin"' >> ~/.bashrc \
+ && : "Done"
+ENV PATH="${PATH}:/home/${USER_NAME}/works/node_modules/.bin"
