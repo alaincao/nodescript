@@ -113,7 +113,7 @@ export async function runBackupRequest(log:Log, item:BackupRequest) : Promise<vo
 	if( snapshots.first == null )
 		throw "There is no snapshot available for '"+item.name+"'";
 	const lastSnapshot = snapshots.last!;  // Assume not null: if there's a first, there is a last
-	log.log( `Backups state: lastFull.size: ${common.humanFileSize(backups.lastFull?.size)??'<null>'} ; last.sizeCumulated: ${common.humanFileSize(backups.last.sizeCumulated)} ; ratio: ${backups.last.sizeCumulated / (backups.lastFull?.size??backups.last.sizeCumulated)}` );
+	log.log( `Backups state: lastFull.size: ${common.humanFileSize(backups.lastFull?.size)??'<null>'} ; last.sizeCumulated: ${common.humanFileSize(backups.last?.sizeCumulated)} ; ratio: ${backups.last?.sizeCumulated / (backups.lastFull?.size??backups.last?.sizeCumulated)}` );
 
 	let parentSnapshot : btrfs.SnapshotEntry|undefined;
 	if( backups.last == null )
