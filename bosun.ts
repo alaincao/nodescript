@@ -1,21 +1,17 @@
-
-import * as http from 'http';
-import * as https from 'https';
 import * as moment from 'moment';
 import * as common from './common';
 import logger from './logger';
 
 export const config = {  // NB: exported variables are constants => Need a container ; cf. https://github.com/Microsoft/TypeScript/issues/6751
 		hostName		: <string|null>null,  // REQUIRED !
-		bosunHost		: 'UNSET',  // REQUIRED !
-		bosunHostInSSL	: false,
+		bosunWriteUrl	: 'http://<<HOSTNAME>>/api/put',
 		useSudo			: false,
-		sendBatchSize	: 10,
+		sendBatchSize	: 100,
 		sendRetryNumber	: 3,
 		sendRetryDelay	: 3000,  // In milliseconds
 	};
-
-const dirSizeCommand = "du --block-size=1 --summarize '{DIR}' | sed -e 's/\t.*//g'";
+export const metricContainerSize = 'container_size';
+export const metricSubvolumeSize = 'subvolume_size';
 
 export interface Item
 {
@@ -54,29 +50,6 @@ export function createItem(p:{timestamp?:number, metric:string, value:number}) :
 	return item;
 }
 
-export function send_legacy(p:{values:Item[]}) : void
-{
-	const requestContent = JSON.stringify( p.values );
-	const ht = config.bosunHostInSSL ? https : http;
-	const request = ht.request( {	host: config.bosunHost,
-									port: config.bosunHostInSSL ? 443 : 80,
-									path: '/api/put',
-									method: 'POST',
-									headers: {	'Content-Type': 'application/x-www-form-urlencoded',
-												'Content-Length': Buffer.byteLength(requestContent) } },
-								function(response)
-								{
-									console.log( 'request: '+requestContent );
-									console.log( 'response ('+response.statusCode+'): '+response.statusMessage );
-
-									if( response.statusCode != 204 )
-										// Error
-										throw new Error( 'Response status code '+response.statusCode );
-								} );
-	request.write( requestContent );
-	request.end();
-}
-
 export async function send(log:logger, values:Item[]) : Promise<void>
 {
 	log.log( `Create batches of ${config.sendBatchSize} items ; ${values.length} items to send` );
@@ -96,7 +69,7 @@ export async function send(log:logger, values:Item[]) : Promise<void>
 		{
 			try
 			{
-				await send_private( log2, batch );
+				await send_private({ log: log2, items: batch });
 			}
 			catch( ex )
 			{
@@ -121,42 +94,23 @@ export async function send(log:logger, values:Item[]) : Promise<void>
 	} // for(batches)
 }
 
-function send_private(log:logger, values:Item[]) : Promise<void>
-{
-	const requestContent = JSON.stringify( values );
-	log.log( 'Send: ', requestContent );
+async function send_private({ log, items }: { log: logger, items: Item[] }): Promise<void> {
+	const url = config.bosunWriteUrl ?? common.throwError("Bosun: config 'bosunWriteUrl' is not set");
 
-	return new Promise<void>( (resolve, reject)=>
-		{
-			const ht = config.bosunHostInSSL ? https : http;
-			const request = ht.request( {	host: config.bosunHost,
-											port: config.bosunHostInSSL ? 443 : 80,
-											path: '/api/put',
-											method: 'POST',
-											headers: {	'Content-Type': 'application/x-www-form-urlencoded',
-														'Content-Length': Buffer.byteLength(requestContent) } },
-										function(response)
-										{
-											log.log( 'Response status code', response.statusCode, response.statusMessage );
+	const body = JSON.stringify(items);
+	log.log(`Send:\n${body}`);
 
-											if( response.statusCode != 204 )
-												// Error
-												reject( 'Response status code '+response.statusCode );
-											else
-												resolve();
-										} );
-			request.write( requestContent );
-			request.end();
-		} );
-}
-
-export async function sendDirSize(p:{ log:logger, metric:string, name:string, dir:string, timestamp?:number }) : Promise<void>
-{
-	const {stdout} = await common.run({ log:p.log.child('run'), command:(config.useSudo?'sudo ':'')+dirSizeCommand, 'DIR':p.dir });
-	p.log.log( 'Parse size' );
-	const size = parseInt( stdout );
-
-	const item = createItem({ timestamp:p.timestamp, metric:p.metric, value:size });
-	item.tags['name'] = p.name;
-	await send( p.log, [item] );
+	const response = await fetch(url, {
+		method: 'POST',
+		headers: {
+			'Content-Type': 'application/x-www-form-urlencoded',
+			'Content-Length': `${Buffer.byteLength(body)}`
+		},
+		body,
+	});
+	log.log('Response status code', response.status, response.statusText);
+	if (!response.ok) {
+		log.log('Response text: ', await response.text());
+		common.throwError(`Bosun response ${response.status}: ${response.statusText}`, log);
+	}
 }

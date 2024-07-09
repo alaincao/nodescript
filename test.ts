@@ -13,7 +13,8 @@ import * as sensors from './sensors';
 
 async function main() : Promise<void>
 {
-	const log = new Log( 'test' );
+	const log = new Log('test', undefined, (name, date, message) =>
+		console.log(`${name}: ${message}`));
 	log.log( '*** start' );
 	try
 	{

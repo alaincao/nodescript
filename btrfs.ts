@@ -5,7 +5,8 @@ import Log from './logger';
 import * as common from './common';
 
 export const config = {  // NB: exported variables are constants => Need a container ; cf. https://github.com/Microsoft/TypeScript/issues/6751
-	useSudo : false,
+	useSudo: false,
+	debug: false,
 };
 export const formats = {
 	snapshot : '{NAME}_{TAG}',
@@ -23,6 +24,8 @@ export const formats = {
 const commands = {
 	fishow : "btrfs filesystem show '{MOUNTPOINT}'",
 	driveName : "lsblk -no pkname {DEVICEPATH}",  // Returns the name of the drive containing the specified partition ; e.g. for DEVICEPATH='/dev/sda1' => will return 'sda'
+	devStats: 'btrfs dev stats {MOUNTPOINT}',
+	dirSize: "du --block-size=1 --summarize '{DIR}' | sed -e 's/\t.*//g'",
 	balance : {
 		complete	: "btrfs balance start '{MOUNTPOINT}'",
 		fast		: "btrfs balance start -dusage=50 -musage=50 '{MOUNTPOINT}'",
@@ -72,40 +75,56 @@ const commands = {
 };
 
 /** List the drives used by a filesystem's pool */
-export async function getPoolDrives(p:{ log:Log, mountPoint:string, diskNameOnly?:boolean }) : Promise<string[]>
-{
-	p.log.log( 'Start' );
-	const {stdout} = await common.run({ log:p.log, command:(config.useSudo?'sudo ':'')+commands.fishow, 'MOUNTPOINT':p.mountPoint });
-	const lines = stdout.split( /\r?\n\r?/ );
+export async function getPoolDrives({ log, mountPoint }: { log: Log, mountPoint: string }) {
+	log.log('Start');
+	const { stdout: fishow } = await common.run({ log, command: (config.useSudo ? 'sudo ' : '') + commands.fishow, 'MOUNTPOINT': mountPoint });
+	const fishowLines = fishow.split(/\r?\n\r?/);
 
-	let drives : string[] = [];
-	for( const line of lines )
-	{
-		if(! line.trimLeft().startsWith('devid') )
-			// Not device listing line
-			continue;
-		const tokens = line.split( ' ' );
-		drives.push( tokens[tokens.length-1] );  // Last token of the line is the drive name
+	const tasks = fishowLines  // "        devid    5 size 5.46TiB used 5.46TiB path /dev/sda1"
+		.map((line) => line.trim().split(/\s+/))
+		.filter((tokens) => tokens[0] === 'devid')
+		.map(async (tokens) => {
+			const [lblDevid, devid, lblSize, size, lblUsed, used, lblPath, devicePath] = tokens;
+			const poolId = parseInt(devid);
+			const deviceName = path.basename(devicePath);
+
+			let { stdout: driveName } = await common.run({ log: log.child(`lsblk_${path.basename(devicePath)}`), command: (config.useSudo ? 'sudo ' : '') + commands.driveName, 'DEVICEPATH': devicePath })
+			driveName = driveName.trim();
+
+			return {
+				poolId,      // 5
+				devicePath,  // /dev/sda1
+				deviceName,  // sda1
+				driveName,   // sda
+			};
+		});
+	return await Promise.all(tasks);
+}
+
+export async function getStats({ log, mountPoint }: { log: Log, mountPoint: string }) {
+	const command = (config.useSudo ? 'sudo ' : '') + commands.devStats;
+	const { stdout } = await common.run({ log, command, logstds: config.debug, 'MOUNTPOINT': mountPoint });
+	const lines = stdout.split(/\r?\n\r?/);
+
+	const items: { deviceName: string, metric: string, value: number }[] = [];
+	for (let i = 0; i < lines.length; ++i) {
+		const line = lines[i];
+		if (line.length == 0)
+			continue;  // Discard any empty lines
+
+		const match = (/^\[\/dev\/(.*)\].([a-z\_]+)\s+(\d+)$/g).exec(line);
+		if (match == null)
+			throw `getBtrfsStats: regexp failed`;
+		const deviceName = match[1];
+		const metric = match[2];
+		const value = parseFloat(match[3]);
+
+		const item = { deviceName, metric, value };
+		log.log(JSON.stringify(item));
+		items.push(item);
 	}
 
-	if( (p.diskNameOnly == true) )
-	{
-		// If partitions are used, get the name of the drives containing those partitions  (e.g. '/dev/sda1' => 'sda')
-		const tasks = drives.map( async devicePath=>
-			{
-				const {stdout} = await common.run({ log:p.log.child(`lsblk_${path.basename(devicePath)}`), command:(config.useSudo?'sudo ':'')+commands.driveName, 'DEVICEPATH':devicePath })
-				return stdout.trim();
-			} );
-		drives = await Promise.all( tasks );
-	}
-	else
-	{
-		// Extract the device name from the paths (e.g. '/dev/sda1' => 'sda1')
-		drives = drives.map( v=>path.basename(v) );
-	}
-
-	p.log.log( 'End' );
-	return drives;
+	return items;
 }
 
 export async function balance(p:{ log:Log, type:'complete'|'fast'|'fastpartial', mountPoint:string }) : Promise<void>
@@ -122,14 +141,14 @@ export async function scrub(p:{ log:Log, mountPoint:string }) : Promise<void>
 	p.log.log( 'End' );
 }
 
-export async function snapshotCreate(p:{ log:Log, name:string, srcSubvolume:string, dstDirectory:string }) : Promise<{name:string,path:string}>
-{
+export async function snapshotCreate(p: { log: Log, name: string, srcSubvolume: string, dstDirectory: string }): Promise<{ name: string, path: string, tag: string }> {
 	p.log.log( 'Start' );
-	const dstName = formats.snapshot.replace( '{NAME}', p.name ).replace( '{TAG}', common.TAG );
+	const tag = common.TAG;
+	const dstName = formats.snapshot.replace('{NAME}', p.name).replace('{TAG}', tag);
 	const dstPath = path.join( p.dstDirectory, dstName );
 	await common.run({ log:p.log, command:(config.useSudo?'sudo ':'')+commands.snapshot.create, 'SRC':p.srcSubvolume, 'DST':dstPath });
 	p.log.log( 'End' );
-	return { name:dstName, path:dstPath };
+	return { name: dstName, path: dstPath, tag };
 }
 
 export async function snapshotDelete(p:{ log:Log, subvolume:string, dir?:string }) : Promise<void>
@@ -157,24 +176,33 @@ export async function snapshotSize(p:{ log:Log, parent:SnapshotEntry, child:Snap
 	return bytes;
 }
 
-export async function send(p:{ log:Log, snapshot:SnapshotEntry, parent?:SnapshotEntry, destinationDir:string }) : Promise<void>
-{
+export async function dirSize({ log, dir }: { log: Log, dir: string }): Promise<number> {
+	log.log('Get dir size');
+	const { stdout } = await common.run({ log: log.child('run'), command: (config.useSudo ? 'sudo ' : '') + commands.dirSize, 'DIR': dir });
+	log.log('Parse size');
+	return parseInt(stdout);
+}
+
+export async function send(p: { log: Log, snapshot: SnapshotEntry, parent?: SnapshotEntry, destinationDir: string }): Promise<{ destinationSubvolume: string }> {
 	p.log.log( 'Start' );
-	const srcSubvolume = path.join( p.snapshot.containerDir, p.snapshot.subvolumeName );
+	const name = p.snapshot.subvolumeName;
+	const srcSubvolume = path.join(p.snapshot.containerDir, name);
+	const destinationSubvolume = path.join(p.destinationDir, name);
 
 	if( p.parent == null )
 	{
-		p.log.log( 'Send full snapshot', p.snapshot.subvolumeName );
+		p.log.log('Send full snapshot', name);
 		await common.run({ log:p.log, command:(config.useSudo?commands.snapshot.send.direct.sudo:commands.snapshot.send.direct.regular), 'SRC':srcSubvolume, 'DST_DIR':p.destinationDir });
 	}
 	else
 	{
-		p.log.log( 'Send partial snapshot', p.snapshot.subvolumeName );
+		p.log.log('Send partial snapshot', name);
 		const parentSubvolume = path.join( p.parent.containerDir, p.parent.subvolumeName );
 		await common.run({ log:p.log, command:(config.useSudo?commands.snapshot.send.parent.sudo:commands.snapshot.send.parent.regular), 'SRC':srcSubvolume, 'PARENT':parentSubvolume, 'DST_DIR':p.destinationDir });
 	}
 
 	p.log.log( 'End' );
+	return { destinationSubvolume };
 }
 
 export async function backupCreate(p:{ log:Log, snapshot:SnapshotEntry, parent?:SnapshotEntry, backupDestinationDir:string, subvolumeDestinationDir?:string }) : Promise<void>

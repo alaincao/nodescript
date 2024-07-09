@@ -4,6 +4,7 @@ import Log from './logger';
 import * as common from './common';
 import * as btrfs from './btrfs';
 import * as bosun from './bosun';
+import * as influxdb from './influxdb';
 
 // Do not create incremental backup if last full was less than 10Mb
 const minIncrementalSize = 1024 * 1024 * 10;
@@ -17,26 +18,13 @@ export async function runSnapshotRequest(log:Log, item:SnapshotRequest) : Promis
 	const dir = item.snapshotsDir;
 
 	log.log( 'Create snapshot' );
-	const { path:dstPath } = await btrfs.snapshotCreate({ log:log, name:name, srcSubvolume:item.subvolume, dstDirectory:dir });
+	const { path: dstPath, tag: timestampTag } = await btrfs.snapshotCreate({ log: log, name: name, srcSubvolume: item.subvolume, dstDirectory: dir });
 
-	if( item.bosunMetric != null )
-	{
-		log.log( 'Send directory size to Bosun' );
-		await bosun.sendDirSize({ log:log.child('bosun'), metric:item.bosunMetric, name:name, dir:dstPath, timestamp:bosun.createTimeStampFromTag() });
-	}
-
-	if( item.backup != null )
-	{
-		const backupRequest : BackupRequest = {
-				name					: item.name,
-				sourceSnapshotsDir		: item.snapshotsDir,
-				sourceSnapshotsRemove	: false,
-				destinationBackupsDir	: item.backup.dir,
-				fullThreshold			: item.backup.fullThreshold,
-				fullMaxAgeDays			: item.backup.fullMaxAgeDays,
-				backupRotation			: item.backup.rotation,
-			};
-		await runBackupRequest( log.child('bkp'), backupRequest );
+	if (item.metric != null) {
+		await sendMetrics({
+			log, useBosun: item.metric.useBosun, useInflux: item.metric.useInflux,
+			subvolSize: { name: item.name, isContainer: item.metric.isContainer, path: dstPath, timestampTag },
+		});
 	}
 
 	if( item.snapshotsRotation != null )
@@ -57,10 +45,10 @@ export async function runSendRequest(log:Log, item:SendRequest) : Promise<void>
 		btrfs.listSnapshots({ log:log.child('listdsts'), name:item.name, dir:item.dstDir }) ]);
 	if( srcs.list.length == 0 )
 		throw `There is no snapshot available for '${item.name}'`;
+	const srcsLast = srcs.last!;
 
-	if( (dsts.last != null) && (srcs.last!.tag == dsts.last.tag) )
-	{
-		log.log( `Nothing to do: last snapshot '${srcs.last!.subvolumeName}' has already been sent to '${item.dstDir}'` );
+	if ((dsts.last != null) && (srcsLast.tag == dsts.last.tag)) {
+		log.log(`Nothing to do: last snapshot '${srcsLast.subvolumeName}' has already been sent to '${item.dstDir}'`);
 		return;
 	}
 
@@ -78,21 +66,22 @@ export async function runSendRequest(log:Log, item:SendRequest) : Promise<void>
 			log.log( `Using parent subvolume '${parent.subvolumeName}'` );
 	}
 
-	await btrfs.send({ log:log, snapshot:srcs.last!, parent:parent, destinationDir:item.dstDir });
-
-	if( item.bosunMetric != null )
-	{
-		log.log( 'Send directory size to Bosun' );
-		await bosun.sendDirSize({ log:log.child('bosun'), metric:item.bosunMetric, name:item.name, dir:path.join(item.dstDir, srcs.last!.subvolumeName) , timestamp:bosun.createTimeStampFromTag(srcs.last!.tag) });
-	}
+	const { destinationSubvolume } = await btrfs.send({ log: log, snapshot: srcsLast, parent: parent, destinationDir: item.dstDir });
 
 	if( item.srcRemove === true )
 	{
-		log.log( 'Remove obsolete snapshots' );
+		log.log('Remove obsolete source snapshots');
 		const obsoletes = srcs.list.slice( 0, srcs.list.length-1 );  // Remove all except the last one (which have just been backuped)
 		await Promise.all( obsoletes.map(e=>btrfs.snapshotDelete({	log			: log.child('del.'+e.subvolumeName),
 																	subvolume	: e.subvolumeName,
 																	dir			: e.containerDir })) );
+	}
+
+	if (item.metric != null) {
+		await sendMetrics({
+			log, useBosun: item.metric.useBosun, useInflux: item.metric.useInflux,
+			subvolSize: { name: item.name, isContainer: item.metric.isContainer, path: destinationSubvolume, timestampTag: srcsLast.tag },
+		});
 	}
 
 	if( item.dstRotation != null )
@@ -170,12 +159,11 @@ export async function runBackupRequest(log:Log, item:BackupRequest) : Promise<vo
 		destinationSnapshotDir = undefined;
 	await btrfs.backupCreate({ log:log, snapshot:lastSnapshot, parent:parentSnapshot, subvolumeDestinationDir:destinationSnapshotDir, backupDestinationDir:item.destinationBackupsDir });
 
-	if( item.bosunMetric != null )
-	{
-		log.log( 'Send directory size to Bosun' );
-		if( item.sourceSnapshotServer != null )
-			throw 'NYI: Send remote directory size to bosun is not yet implemented!';
-		await bosun.sendDirSize({ log:log.child('bosun'), metric:item.bosunMetric, name:item.name, dir:path.join(lastSnapshot.containerDir, lastSnapshot.subvolumeName)  , timestamp:bosun.createTimeStampFromTag(lastSnapshot.tag) });
+	if (item.metric != null) {
+		await sendMetrics({
+			log, useBosun: item.metric.useBosun, useInflux: item.metric.useInflux,
+			backupSize: { name: item.name, isContainer: item.metric.isContainer, backupsDir: item.destinationBackupsDir },
+		});
 	}
 
 	if( item.sourceSnapshotsRemove )
@@ -200,6 +188,85 @@ export async function runBackupRequest(log:Log, item:BackupRequest) : Promise<vo
 		log.log( 'Run destination snapshots rotation' );
 		await item.destinationSnapshot.rotation({ log:log.child('rot'), name:item.name, dir:item.destinationSnapshot.dir });
 	}
+}
+
+async function sendMetrics({ log, useBosun = false, useInflux = false, subvolSize, backupSize }: {
+	log: Log,
+	useBosun?: boolean,
+	useInflux?: boolean,
+
+	subvolSize?: { name: string, isContainer: boolean, path: string, timestampTag?: string },
+	backupSize?: { name: string, isContainer: boolean, backupsDir: string },
+}) {
+	log = log.child('sendmetrics');
+	log.log('Start');
+
+	const bosunItems = [] as bosun.Item[];
+	const influxItems = [] as influxdb.Item[];
+
+	if (subvolSize != null) {
+		const value = await btrfs.dirSize({ log, dir: subvolSize.path });
+		if (useBosun) {
+			const item = bosun.createItem({
+				metric: subvolSize.isContainer ? bosun.metricContainerSize : bosun.metricSubvolumeSize,
+				timestamp: bosun.createTimeStampFromTag(),
+				value,
+			});
+			item.tags['name'] = subvolSize.name;
+			bosunItems.push(item);
+		}
+		if (useInflux) {
+			influxItems.push(influxdb.createItem({
+				metric: influxdb.metrics.subvolume._,
+				timestamp: influxdb.createTimeStampFromTag(),
+				tags: {
+					name: subvolSize.name,
+					[influxdb.metrics.subvolume.isContainer]: `${subvolSize.isContainer}`,
+				},
+				values: { [influxdb.metrics.subvolume.size]: value },
+			}));
+		}
+	}
+
+	if (backupSize != null) {
+		const list = await btrfs.listBackups({ log: log.child('listbkp'), name: backupSize.name, dir: backupSize.backupsDir });
+		if (list.list.length == 0) {
+			log.log(`No backup found`);
+		} else {
+			const entry = list.last;
+			if (useBosun) {
+				// not supported yet ...
+			}
+			if (useInflux) {
+				influxItems.push(influxdb.createItem({
+					metric: influxdb.metrics.subvolume._,
+					timestamp: influxdb.createTimeStampFromTag(entry.tag),
+					tags: {
+						name: backupSize.name,
+						[influxdb.metrics.subvolume.isContainer]: `${backupSize.isContainer}`,
+						[influxdb.metrics.subvolume.isFullBackup]: `${entry.parent == null}`,
+					},
+					values: {
+						[influxdb.metrics.subvolume.backupSize]: entry.size,
+						[influxdb.metrics.subvolume.backupSizeCumulated]: entry.sizeCumulated,
+					},
+				}));
+			}
+		}
+	}
+
+	const sendTasks = [] as Promise<void>[];
+	if (bosunItems.length > 0) {
+		log.log('Send to Bosun');
+		sendTasks.push(bosun.send(log.child('bosun'), bosunItems));
+	}
+	if (influxItems.length > 0) {
+		log.log('Send to Bosun');
+		sendTasks.push(influxdb.send({ log: log.child('influx'), items: influxItems }));
+	}
+	await Promise.all(sendTasks);
+
+	log.log('End');
 }
 
 /** Keep only the last X snapshots */
@@ -394,19 +461,18 @@ async function backupsRotation_keepAtLeastNDays(p:{ log:Log, name:string, dir:st
 export type SnapshotsRotation = (p:{ log:Log, name:string, dir:string })=>Promise<void>;
 export type BackupsRotation = (p:{ log:Log, name:string, dir:string })=>Promise<void>;
 
+export type Metric = {
+	useBosun?: boolean,
+	useInflux?: boolean,
+	isContainer: boolean,
+}
 export interface SnapshotRequest
 {
 	name				: string;
 	subvolume			: string;
 	snapshotsDir		: string;
 	snapshotsRotation?	: SnapshotsRotation;
-	backup?				: {
-								dir				: string;
-								fullThreshold?	: number;
-								fullMaxAgeDays?	: number;
-								rotation		: BackupsRotation;
-							};
-	bosunMetric?		: string;
+	metric?				: Metric;
 }
 export interface SendRequest
 {
@@ -415,7 +481,7 @@ export interface SendRequest
 	dstDir			: string;
 	srcRemove		: boolean;
 	dstRotation?	: SnapshotsRotation;
-	bosunMetric?	: string;
+	metric?			: Metric;
 }
 export interface BackupRequest
 {
@@ -430,6 +496,6 @@ export interface BackupRequest
 								};
 	fullThreshold?			: number;
 	fullMaxAgeDays?			: number;
-	bosunMetric?			: string;
+	metric?					: Metric;
 	backupRotation?			: BackupsRotation;
 }

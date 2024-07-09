@@ -15,7 +15,6 @@ const commands = {
 	smartctl			: 'smartctl --attributes /dev/{DISK}',
 	diskStandbyStatus	: 'hdparm -C {DRIVES}',
 	diskSpinDown		: 'hdparm -y {DRIVES}',
-	btrfsDevStats		: 'btrfs dev stats {SUBVOLUME}',
 };
 
 export async function getSensorsValues(p:{ log:Log }) : Promise<{[key:string]:{[key:string]:{[key:string]:number}}}>
@@ -137,32 +136,4 @@ export async function spinDownDisks(p:{ log:Log, drives:string[] }) : Promise<vo
 	const driveString = p.drives.map( v=>'/dev/'+v ).join( ' ' );
 	p.log.log( `spinDownDisk '${driveString}'` );
 	await common.run({ log:p.log.child('run'), command:(config.useSudo?'sudo ':'')+commands.diskSpinDown, 'DRIVES':driveString });
-}
-
-export async function getBtrfsStats(log:Log, subvolume:string) : Promise<{disk:string,metric:string,value:number}[]>
-{
-	const command = (config.useSudo?'sudo ':'')+commands.btrfsDevStats;
-	const {stdout} = await common.run({ log, command, logstds:config.debug, 'SUBVOLUME':subvolume });
-	const lines = stdout.split( /\r?\n\r?/ );
-
-	const items : {disk:string,metric:string,value:number}[] = [];
-	for( let i=0; i<lines.length; ++i )
-	{
-		const line = lines[i];
-		if( line.length == 0 )
-			continue;  // Discard any empty lines
-
-		const match = ( /^\[\/dev\/(.*)\].([a-z\_]+)\s+(\d+)$/g ).exec( line );
-		if( match == null )
-			throw `getBtrfsStats: regexp failed`;
-		const disk = match[1];
-		const metric = match[2];
-		const value = parseFloat( match[3] );
-
-		const item = { disk, metric, value };
-		log.log( JSON.stringify(item) );
-		items.push( item );
-	}
-
-	return items;
 }

@@ -64,6 +64,11 @@ export function setHasErrors() : void
 	hasErrors = true;
 }
 
+/** Syntax hack for use in "xxx ?? throwError('error')" situations */
+export function throwError(message: string, log?: Log): never {
+	throw new Error(message);
+}
+
 export function sleep(ms:number) : Promise<void>
 {
 	return new Promise( callback=>setTimeout(callback, ms) );
@@ -377,6 +382,10 @@ export async function forEach<T>(t:T[], callback:(item:T,i:number)=>Promise<void
 {
 	for( let i=0; i<t.length; ++i )
 		await callback( t[i], i );
+}
+
+export function constArray<T extends string>(a: Array<T>): T[] {
+	return a;
 }
 
 export function arraySum<T>(a:T[], f:(e:T)=>number) : number
