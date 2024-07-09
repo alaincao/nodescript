@@ -48,5 +48,12 @@
 				"$gulp-tsc"
 			]
 		},
+		{
+			"type": "gulp",
+			"task": "test.js",
+			"problemMatcher": [
+				"$gulp-tsc"
+			]
+		},
 	]
 }
