@@ -25,7 +25,7 @@ export function init(p:{log:Log, tag?:string}) : void
 
 	let exitHandler = function(options,err)
 		{
-			p.log.output();
+			console.log(p.log.getLines().join('\n'));
 			switch( options.mode )
 			{
 				case "on exit":

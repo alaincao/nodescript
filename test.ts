@@ -13,8 +13,9 @@ import * as sensors from './sensors';
 
 async function main() : Promise<void>
 {
-	const log = new Log('test', undefined, (name, date, message) =>
-		console.log(`${name}: ${message}`));
+	const log = new Log('test', undefined, (self, date, args) => {
+		console.log(self.getLineString({ args }));
+	});
 	log.log( '*** start' );
 	try
 	{
