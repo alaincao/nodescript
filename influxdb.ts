@@ -3,10 +3,10 @@ import * as common from './common';
 import logger from './logger';
 
 export const config = {  // NB: exported variables are constants => need a container ; cf. https://github.com/Microsoft/TypeScript/issues/6751
-	influxWriteUrl: 'http://<<<HOSTNAME>>>/api/v2/write?precision=s&orgID=<<ORGANIZATION ID>>&bucket=<<BUCKET NAME>>',
-	influxToken: '<<API TOKEN>>',
-	hostName: <string | null>null,  // REQUIRED !
-	sendBatchSize: 10,
+	influxWriteUrl: <string>null!,  // REQUIRED ! ie. 'http://<<<HOSTNAME>>>/api/v2/write?precision=s&orgID=<<ORGANIZATION ID>>&bucket=<<BUCKET NAME>>',
+	influxToken: <string>null!,  // REQUIRED ! eg. '0-Cfq[...]WEQ=='
+	hostName: <string>null!,  // REQUIRED ! eg. 'testhostname'
+	sendBatchSize: 100,
 	sendRetryNumber: 3,
 	sendRetryDelay: 3000,  // In milliseconds
 }

@@ -3,7 +3,6 @@ import * as path from 'path';
 import Log from './logger';
 import * as common from './common';
 import * as btrfs from './btrfs';
-import * as bosun from './bosun';
 import * as influxdb from './influxdb';
 
 // Do not create incremental backup if last full was less than 10Mb
@@ -22,7 +21,7 @@ export async function runSnapshotRequest(log:Log, item:SnapshotRequest) : Promis
 
 	if (item.metric != null) {
 		await sendMetrics({
-			log, useBosun: item.metric.useBosun, useInflux: item.metric.useInflux,
+			log,
 			subvolSize: { name: item.name, isContainer: item.metric.isContainer, path: dstPath, timestampTag },
 		});
 	}
@@ -79,7 +78,7 @@ export async function runSendRequest(log:Log, item:SendRequest) : Promise<void>
 
 	if (item.metric != null) {
 		await sendMetrics({
-			log, useBosun: item.metric.useBosun, useInflux: item.metric.useInflux,
+			log,
 			subvolSize: { name: item.name, isContainer: item.metric.isContainer, path: destinationSubvolume, timestampTag: srcsLast.tag },
 		});
 	}
@@ -161,7 +160,7 @@ export async function runBackupRequest(log:Log, item:BackupRequest) : Promise<vo
 
 	if (item.metric != null) {
 		await sendMetrics({
-			log, useBosun: item.metric.useBosun, useInflux: item.metric.useInflux,
+			log,
 			backupSize: { name: item.name, isContainer: item.metric.isContainer, backupsDir: item.destinationBackupsDir },
 		});
 	}
@@ -190,42 +189,27 @@ export async function runBackupRequest(log:Log, item:BackupRequest) : Promise<vo
 	}
 }
 
-async function sendMetrics({ log, useBosun = false, useInflux = false, subvolSize, backupSize }: {
+async function sendMetrics({ log, subvolSize, backupSize }: {
 	log: Log,
-	useBosun?: boolean,
-	useInflux?: boolean,
-
 	subvolSize?: { name: string, isContainer: boolean, path: string, timestampTag?: string },
 	backupSize?: { name: string, isContainer: boolean, backupsDir: string },
 }) {
 	log = log.child('sendmetrics');
 	log.log('Start');
 
-	const bosunItems = [] as bosun.Item[];
 	const influxItems = [] as influxdb.Item[];
 
 	if (subvolSize != null) {
 		const value = await btrfs.dirSize({ log, dir: subvolSize.path });
-		if (useBosun) {
-			const item = bosun.createItem({
-				metric: subvolSize.isContainer ? bosun.metricContainerSize : bosun.metricSubvolumeSize,
-				timestamp: bosun.createTimeStampFromTag(),
-				value,
-			});
-			item.tags['name'] = subvolSize.name;
-			bosunItems.push(item);
-		}
-		if (useInflux) {
-			influxItems.push(influxdb.createItem({
-				metric: influxdb.metrics.subvolume._,
-				timestamp: influxdb.createTimeStampFromTag(),
-				tags: {
-					name: subvolSize.name,
-					[influxdb.metrics.subvolume.isContainer]: `${subvolSize.isContainer}`,
-				},
-				values: { [influxdb.metrics.subvolume.size]: value },
-			}));
-		}
+		influxItems.push(influxdb.createItem({
+			metric: influxdb.metrics.subvolume._,
+			timestamp: influxdb.createTimeStampFromTag(),
+			tags: {
+				name: subvolSize.name,
+				[influxdb.metrics.subvolume.isContainer]: `${subvolSize.isContainer}`,
+			},
+			values: { [influxdb.metrics.subvolume.size]: value },
+		}));
 	}
 
 	if (backupSize != null) {
@@ -234,34 +218,25 @@ async function sendMetrics({ log, useBosun = false, useInflux = false, subvolSiz
 			log.log(`No backup found`);
 		} else {
 			const entry = list.last;
-			if (useBosun) {
-				// not supported yet ...
-			}
-			if (useInflux) {
-				influxItems.push(influxdb.createItem({
-					metric: influxdb.metrics.subvolume._,
-					timestamp: influxdb.createTimeStampFromTag(entry.tag),
-					tags: {
-						name: backupSize.name,
-						[influxdb.metrics.subvolume.isContainer]: `${backupSize.isContainer}`,
-						[influxdb.metrics.subvolume.isFullBackup]: `${entry.parent == null}`,
-					},
-					values: {
-						[influxdb.metrics.subvolume.backupSize]: entry.size,
-						[influxdb.metrics.subvolume.backupSizeCumulated]: entry.sizeCumulated,
-					},
-				}));
-			}
+			influxItems.push(influxdb.createItem({
+				metric: influxdb.metrics.subvolume._,
+				timestamp: influxdb.createTimeStampFromTag(entry.tag),
+				tags: {
+					name: backupSize.name,
+					[influxdb.metrics.subvolume.isContainer]: `${backupSize.isContainer}`,
+					[influxdb.metrics.subvolume.isFullBackup]: `${entry.parent == null}`,
+				},
+				values: {
+					[influxdb.metrics.subvolume.backupSize]: entry.size,
+					[influxdb.metrics.subvolume.backupSizeCumulated]: entry.sizeCumulated,
+				},
+			}));
 		}
 	}
 
 	const sendTasks = [] as Promise<void>[];
-	if (bosunItems.length > 0) {
-		log.log('Send to Bosun');
-		sendTasks.push(bosun.send(log.child('bosun'), bosunItems));
-	}
 	if (influxItems.length > 0) {
-		log.log('Send to Bosun');
+		log.log('Send to InfluxDB');
 		sendTasks.push(influxdb.send({ log: log.child('influx'), items: influxItems }));
 	}
 	await Promise.all(sendTasks);
@@ -462,8 +437,6 @@ export type SnapshotsRotation = (p:{ log:Log, name:string, dir:string })=>Promis
 export type BackupsRotation = (p:{ log:Log, name:string, dir:string })=>Promise<void>;
 
 export type Metric = {
-	useBosun?: boolean,
-	useInflux?: boolean,
 	isContainer: boolean,
 }
 export interface SnapshotRequest
