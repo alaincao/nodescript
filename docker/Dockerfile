@@ -32,33 +32,47 @@ RUN set -ex \
  && : "Done"
 
 # Setups as user 'root'
-ARG USER_NAME
-ARG USER_ID=1000
+ARG TEST_USER_NAME
+ARG TEST_USER_ID
 RUN set -ex \
- && : "Create user ${USER_NAME}" \
- && addgroup --gid "${USER_ID}" "${USER_NAME}" \
- && adduser --disabled-password --gecos "" --uid "${USER_ID}" --gid "${USER_ID}" "${USER_NAME}" \
- && adduser "${USER_NAME}" dialout \
+ && : "Create user ${TEST_USER_NAME}" \
+ && addgroup --gid "${TEST_USER_ID}" "${TEST_USER_NAME}" \
+ && adduser --disabled-password --gecos "" --uid "${TEST_USER_ID}" --gid "${TEST_USER_ID}" "${TEST_USER_NAME}" \
+ && adduser "${TEST_USER_NAME}" dialout \
  && : "Setup sudo" \
- && echo "${USER_NAME} ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers \
+ && echo "${TEST_USER_NAME} ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers \
  && : "Create startup script" \
  && echo "#!/bin/sh" > /start.sh \
  && echo "set -ex" >> /start.sh \
  && echo "env | sort" >> /start.sh \
- && echo "sleep infinity" >> /start.sh \
+ && echo "trap 'true' TERM" >> /start.sh \
+ && echo "sleep infinity &" >> /start.sh \
+ && echo "wait \$!" >> /start.sh \
  && chmod +x /start.sh \
  && : "Done"
 CMD [ "/start.sh" ]
 
-# Setups as user '${USER_NAME}'
-USER ${USER_NAME}
-COPY ./bashrc ./
+RUN set -ex \
+ && : "Install docker CLI" \
+ && curl -fsSL https://download.docker.com/linux/debian/gpg | apt-key add - \
+ && echo "deb [arch=amd64] https://download.docker.com/linux/debian $(lsb_release -cs) stable" >> /etc/apt/sources.list.d/docker.list \
+ && apt-get update \
+ && apt-get install -y docker-ce-cli \
+ && addgroup --gid 136 docker \
+ && adduser "${TEST_USER_NAME}" docker \
+ && : "Done"
+
+# Setups as user '${TEST_USER_NAME}'
+ARG TEST_GIT_NAME
+ARG TEST_GIT_EMAIL
+USER ${TEST_USER_NAME}
+COPY ./bashrc ./bashrc
 RUN set -ex \
  && : "Tweaks" \
  && mkdir ~/.ssh \
  && git config --global core.editor "code --wait" \
- && git config --global user.name "Alain CAO" \
- && git config --global user.email "alaincao17@gmail.com" \
+ && git config --global user.name "${TEST_GIT_NAME}" \
+ && git config --global user.email "${TEST_GIT_EMAIL}" \
  && : "Create user directories" \
  && mkdir ~/bin \
  && mkdir ~/works \
@@ -66,4 +80,4 @@ RUN set -ex \
  && cat bashrc >> ~/.bashrc \
  && sudo rm bashrc \
  && : "Done"
-WORKDIR /home/${USER_NAME}/works/
+WORKDIR /home/${TEST_USER_NAME}/works/
