@@ -70,7 +70,7 @@ WORKDIR /home/${USER_NAME}/works/
 
 RUN set -ex \
  && : "Install nvm" \
- && curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.3/install.sh | bash \
+ && curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.0/install.sh | bash \
  && : "Install node & npm" \
  && bash -c "source ~/.nvm/nvm.sh && nvm install --lts" \
  && : "Append 'node_modules/.bin/' to PATH" \
