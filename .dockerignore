@@ -1,0 +1,6 @@
+/.env
+/.git
+/docker
+/docker-compose.yml
+/node_modules
+/nodescript.code-workspace
