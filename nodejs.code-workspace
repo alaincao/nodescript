@@ -1,0 +1,17 @@
+{
+	"folders": [
+		{
+			"path": "."
+		}
+	],
+	"settings": {
+		"editor.formatOnSave": true
+	},
+	"extensions": {
+		"recommendations": [
+			"humao.rest-client",
+			"mhutchie.git-graph",
+			"ms-azuretools.vscode-docker"
+		]
+	}
+}

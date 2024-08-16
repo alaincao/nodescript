@@ -1,0 +1,5 @@
+/.env
+/.git
+/docker
+/docker-compose.yml
+/nodejs.code-workspace

@@ -1,32 +1,33 @@
-version: '3'
+name: ${DOCKER_STACK_NAME}
+
 services:
 
   test:
-    build: 
+    build:
       context: ./docker/
       args:
-        - USER_NAME=aa
+        - TEST_USER_NAME
+        - TEST_USER_ID
+        - TEST_GIT_NAME
+        - TEST_GIT_EMAIL
     restart: "no"
-    ports:
-      - "5000:5000"
     networks:
-      - internalnet
+      - net_web
     labels:
-      - "traefik.enable=true"
-      - "traefik.http.routers.nodejs.entrypoints=internalweb"
-      - "traefik.http.routers.nodejs.rule=Host(`nodejs.testlocal.home`)"
-      - "traefik.http.services.nodejs.loadbalancer.server.port=5000"
+      - traefik.enable=true
+      - traefik.docker.network=${TRAEFIK_NETWORK}
+      - traefik.http.routers.${DOCKER_STACK_NAME}-dev-frontend.entrypoints=${TRAEFIK_ENTRYPOINT}
+      - traefik.http.routers.${DOCKER_STACK_NAME}-dev-frontend.rule=Host(`${WEBAPP_DOMAIN}`)
+      - traefik.http.services.${DOCKER_STACK_NAME}-dev-frontend.loadbalancer.server.port=${WEBAPP_PORT}
     volumes:
-      - "./:/home/aa/works/"
-      - "/home/aa/.bash_aliases:/home/aa/.bash_aliases:ro"
-      - "/home/aa/.ssh/config:/home/aa/.ssh/config:ro"
-      - "/home/aa/.ssh/key.internal:/home/aa/.ssh/key.internal:ro"
-      - "/home/aa/.ssh/key.internal.pub:/home/aa/.ssh/key.internal.pub:ro"
-      - "/home/aa/.ssh/key.github:/home/aa/.ssh/key.github:ro"
-      - "/home/aa/.ssh/key.github.pub:/home/aa/.ssh/key.github.pub:ro"
-      - "/home/aa/.ssh/key.gitea:/home/aa/.ssh/key.gitea:ro"
-      - "/home/aa/.ssh/key.gitea.pub:/home/aa/.ssh/key.gitea.pub:ro"
+      - "/var/run/docker.sock:/var/run/docker.sock"
+      - "./:/home/${TEST_USER_NAME}/works/"
+      - "/home/${HOST_USER_NAME}/.ssh/config:/home/${TEST_USER_NAME}/.ssh/config:ro"
+      - "/home/${HOST_USER_NAME}/.ssh/key.gitea:/home/${TEST_USER_NAME}/.ssh/key.gitea:ro"
+      - "/home/${HOST_USER_NAME}/.ssh/key.github:/home/${TEST_USER_NAME}/.ssh/key.github:ro"
+      - "/home/${HOST_USER_NAME}/.ssh/key.home:/home/${TEST_USER_NAME}/.ssh/key.home:ro"
 
 networks:
-  internalnet:
+  net_web:
+    name: ${TRAEFIK_NETWORK}
     external: true

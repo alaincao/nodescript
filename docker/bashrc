@@ -1,5 +1,12 @@
 
-# Things added to the ~/.bashrc file:
+# Things added to the ~/.bashrc file from the Dockerfile:
 
 # Append git status to prompt
 export PS1=${PS1%???}' $(__git_ps1 "%s")\$ '
+
+# Some aliases for quality of life ...
+alias lll='ls -lFha'
+alias ll="ls -la"
+alias rm='rm -i'
+alias mv='mv -i'
+alias cp='cp -i'
