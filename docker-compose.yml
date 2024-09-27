@@ -16,6 +16,3 @@ services:
       - "/var/run/docker.sock:/var/run/docker.sock"
       - "./:/home/${TEST_USER_NAME}/works/"
       - "/home/${HOST_USER_NAME}/.ssh/config:/home/${TEST_USER_NAME}/.ssh/config:ro"
-      - "/home/${HOST_USER_NAME}/.ssh/key.gitea:/home/${TEST_USER_NAME}/.ssh/key.gitea:ro"
-      - "/home/${HOST_USER_NAME}/.ssh/key.github:/home/${TEST_USER_NAME}/.ssh/key.github:ro"
-      - "/home/${HOST_USER_NAME}/.ssh/key.home:/home/${TEST_USER_NAME}/.ssh/key.home:ro"

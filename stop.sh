@@ -8,7 +8,7 @@ cd "${APP_DIR}/"
 
 PARM="stop"
 if [ "$1" == "down" ]; then
-	PARM="down"
+	PARM="down --volumes"
 fi
 
-docker compose "${PARM}"
+docker compose --profile '*' ${PARM}
