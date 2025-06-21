@@ -35,10 +35,8 @@ RUN set -ex \
 ARG TEST_USER_NAME
 ARG TEST_USER_ID
 RUN set -ex \
- && if [ -z "$TEST_USER_NAME" ]; then echo "TEST_USER_NAME is not set" && exit 1; fi \
- && if [ -z "$TEST_USER_ID" ]; then echo "TEST_USER_ID is not set" && exit 1; fi \
- && : "Create user ${TEST_USER_NAME}" \
- && addgroup --gid "${TEST_USER_ID}" "${TEST_USER_NAME}" \
+ && : "Create user ${TEST_USER_NAME:?TEST_USER_NAME not set}" \
+ && addgroup --gid "${TEST_USER_ID:?TEST_USER_ID not set}" "${TEST_USER_NAME}" \
  && adduser --disabled-password --gecos "" --uid "${TEST_USER_ID}" --gid "${TEST_USER_ID}" "${TEST_USER_NAME}" \
  && adduser "${TEST_USER_NAME}" dialout \
  && : "Setup sudo" \
@@ -54,13 +52,14 @@ RUN set -ex \
  && : "Done"
 CMD [ "/start.sh" ]
 
+ARG TEST_DOCKER_GID
 RUN set -ex \
  && : "Install docker CLI" \
  && curl -fsSL https://download.docker.com/linux/debian/gpg | apt-key add - \
  && echo "deb [arch=amd64] https://download.docker.com/linux/debian $(lsb_release -cs) stable" >> /etc/apt/sources.list.d/docker.list \
  && apt-get update \
  && apt-get install -y docker-ce-cli \
- && addgroup --gid 136 docker \
+ && addgroup --gid ${TEST_DOCKER_GID:?TEST_DOCKER_GID not set} docker \
  && adduser "${TEST_USER_NAME}" docker \
  && : "Done"
 
@@ -70,6 +69,7 @@ RUN set -ex \
 		btrfs-compsize \
 		btrfs-heatmap \
 		btrfs-progs \
+		hdparm \
  && : "Done"
 
 # Setups as user '${TEST_USER_NAME}'
@@ -78,13 +78,11 @@ ARG TEST_GIT_EMAIL
 USER ${TEST_USER_NAME}
 COPY ./bashrc ./bashrc
 RUN set -ex \
- && if [ -z "$TEST_GIT_NAME" ]; then echo "TEST_GIT_NAME is not set" && exit 1; fi \
- && if [ -z "$TEST_GIT_EMAIL" ]; then echo "TEST_GIT_EMAIL is not set" && exit 1; fi \
  && : "Tweaks" \
  && mkdir ~/.ssh \
  && git config --global core.editor "code --wait" \
- && git config --global user.name "${TEST_GIT_NAME}" \
- && git config --global user.email "${TEST_GIT_EMAIL}" \
+ && git config --global user.name "${TEST_GIT_NAME:?TEST_GIT_NAME not set}" \
+ && git config --global user.email "${TEST_GIT_EMAIL:?TEST_GIT_EMAIL not set}" \
  && : "Create user directories" \
  && mkdir ~/bin \
  && mkdir ~/works \
