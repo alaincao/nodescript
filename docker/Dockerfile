@@ -15,6 +15,7 @@ RUN set -ex \
 		file \
 		git \
 		gitk \
+		gpg \
 		iputils-ping \
 		less \
 		lsb-release \
@@ -55,7 +56,7 @@ CMD [ "/start.sh" ]
 ARG TEST_DOCKER_GID
 RUN set -ex \
  && : "Install docker CLI" \
- && curl -fsSL https://download.docker.com/linux/debian/gpg | apt-key add - \
+ && curl -fsSL https://download.docker.com/linux/debian/gpg | gpg --dearmor -o /etc/apt/trusted.gpg.d/docker.gpg \
  && echo "deb [arch=amd64] https://download.docker.com/linux/debian $(lsb_release -cs) stable" >> /etc/apt/sources.list.d/docker.list \
  && apt-get update \
  && apt-get install -y docker-ce-cli \
